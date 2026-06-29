@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { OpenspecSidebarViewProvider } from './views/sidebar';
 import { OpenspecSpecEditorProvider } from './editors/spec-editor';
+import { isChangeFilePath, isOpenSpecPath } from './specs/paths';
 
 export function activate(context: vscode.ExtensionContext): void {
   const dashboard = new OpenspecSidebarViewProvider(context.extensionUri);
@@ -28,15 +30,27 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
       }
 
-      await vscode.commands.executeCommand('vscode.openWith', uri, OpenspecSpecEditorProvider.viewType);
+      const isSpecMarkdown = path.basename(uri.fsPath).toLowerCase() === 'spec.md';
+      const isCustomChangeMarkdown = isChangeFilePath(uri.fsPath);
+
+      if ((isOpenSpecPath(uri.fsPath) && isSpecMarkdown) || isCustomChangeMarkdown) {
+        await vscode.commands.executeCommand('vscode.openWith', uri, OpenspecSpecEditorProvider.viewType);
+        return;
+      }
+
+      await vscode.commands.executeCommand('vscode.open', uri);
     }),
   );
 
-  const watcher = vscode.workspace.createFileSystemWatcher('**/*.md');
-  watcher.onDidCreate(() => void dashboard.refresh());
-  watcher.onDidChange(() => void dashboard.refresh());
-  watcher.onDidDelete(() => void dashboard.refresh());
-  context.subscriptions.push(watcher);
+  const specWatcher = vscode.workspace.createFileSystemWatcher('**/openspec/**/*.md');
+  const configWatcher = vscode.workspace.createFileSystemWatcher('**/openspec/config.yaml');
+  specWatcher.onDidCreate(() => void dashboard.refresh());
+  specWatcher.onDidChange(() => void dashboard.refresh());
+  specWatcher.onDidDelete(() => void dashboard.refresh());
+  configWatcher.onDidCreate(() => void dashboard.refresh());
+  configWatcher.onDidChange(() => void dashboard.refresh());
+  configWatcher.onDidDelete(() => void dashboard.refresh());
+  context.subscriptions.push(specWatcher, configWatcher);
 }
 
 export function deactivate(): void {}

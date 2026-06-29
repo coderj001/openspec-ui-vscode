@@ -42,6 +42,15 @@ function createEmptySections(): Record<SpecSectionName, string> {
   };
 }
 
+export function countTaskProgress(text: string): SpecTaskProgress {
+  const taskMatches = text.match(checkboxPattern) ?? [];
+
+  return {
+    completed: taskMatches.filter((entry) => /\[x\]/i.test(entry)).length,
+    total: taskMatches.length,
+  };
+}
+
 export function looksLikeSpec(filePath: string, text: string): boolean {
   if (/(^|[\\/])openspec([\\/]|$)/i.test(filePath) || /\bspecs?\b/i.test(path.basename(filePath))) {
     return true;
@@ -83,16 +92,12 @@ export function parseSpecText(filePath: string, text: string): ParsedSpec {
     sections[sectionName] = sections[sectionName].trim();
   }
 
-  const taskMatches = sections.Tasks.match(checkboxPattern) ?? [];
-  const completed = taskMatches.filter((entry) => /\[x\]/i.test(entry)).length;
+  const taskProgress = countTaskProgress(sections.Tasks);
 
   return {
     title,
     status: isArchivePath(filePath) ? 'archive' : 'active',
     sections,
-    taskProgress: {
-      completed,
-      total: taskMatches.length,
-    },
+    taskProgress,
   };
 }

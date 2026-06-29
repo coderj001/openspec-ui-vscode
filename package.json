@@ -39,7 +39,16 @@
         "displayName": "Openspec Spec Viewer",
         "selector": [
           {
-            "filenamePattern": "*.md"
+            "filenamePattern": "proposal.md"
+          },
+          {
+            "filenamePattern": "design.md"
+          },
+          {
+            "filenamePattern": "tasks.md"
+          },
+          {
+            "filenamePattern": "spec.md"
           }
         ]
       }
@@ -57,7 +66,8 @@
       "openspec": [
         {
           "id": "openspec.sidebarView",
-          "name": "Dashboard"
+          "name": "Changes",
+          "type": "webview"
         }
       ]
     }
@@ -70,10 +80,8 @@
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
-    "@types/mocha": "^10.0.10",
     "@types/node": "^22.15.3",
     "@types/vscode": "^1.86.0",
-    "@vscode/test-electron": "^2.4.1",
     "typescript": "^5.8.3"
   }
 }
