@@ -1,0 +1,79 @@
+{
+  "name": "openspec-ext",
+  "displayName": "Openspec UI",
+  "description": "VSCode extension for browsing and viewing Openspec documents.",
+  "version": "0.0.1",
+  "publisher": "openspec",
+  "engines": {
+    "vscode": "^1.86.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:openspec.showDashboard",
+    "onCommand:openspec.openSpec",
+    "onCommand:openspec.refreshDashboard",
+    "onCustomEditor:openspec.specEditor",
+    "onView:openspec.sidebarView"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "openspec.showDashboard",
+        "title": "Openspec: Show Dashboard"
+      },
+      {
+        "command": "openspec.openSpec",
+        "title": "Openspec: Open Spec"
+      },
+      {
+        "command": "openspec.refreshDashboard",
+        "title": "Openspec: Refresh Dashboard"
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "openspec.specEditor",
+        "displayName": "Openspec Spec Viewer",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          }
+        ]
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "openspec",
+          "title": "Openspec",
+          "icon": "resources/openspec.svg"
+        }
+      ]
+    },
+    "views": {
+      "openspec": [
+        {
+          "id": "openspec.sidebarView",
+          "name": "Dashboard"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile",
+    "test": "npm run compile && node ./out/test/runTest.js",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.15.3",
+    "@types/vscode": "^1.86.0",
+    "@vscode/test-electron": "^2.4.1",
+    "typescript": "^5.8.3"
+  }
+}
