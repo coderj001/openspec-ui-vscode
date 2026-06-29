@@ -10,7 +10,24 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+function progressPercent(change: ChangeSummary): number {
+  if (change.taskProgress.total === 0) {
+    return 0;
+  }
+
+  return Math.round((change.taskProgress.completed / change.taskProgress.total) * 100);
+}
+
+function renderPill(label: string, tone: string, enabled: boolean): string {
+  return `<span class="pill pill--${tone} ${enabled ? '' : 'pill--muted'}">${escapeHtml(label)}</span>`;
+}
+
 function renderRow(change: ChangeSummary): string {
+  const hasProposal = Boolean(change.proposalUri);
+  const hasDesign = Boolean(change.designUri);
+  const hasTasks = Boolean(change.tasksUri);
+  const hasSpecs = change.deltaSpecCount > 0;
+
   if (!change.openUri) {
     return `
       <div class="row row--muted">
@@ -20,10 +37,36 @@ function renderRow(change: ChangeSummary): string {
     `;
   }
 
+  if (change.status === 'archive') {
+    return `
+      <button class="row row--archive" data-uri="${escapeHtml(change.openUri.toString())}">
+        <span>${escapeHtml(change.name)}</span>
+        <span>${escapeHtml(change.status)}</span>
+      </button>
+    `;
+  }
+
+  const progress = progressPercent(change);
+
   return `
-    <button class="row" data-uri="${escapeHtml(change.openUri.toString())}">
-      <span>${escapeHtml(change.name)}</span>
-      <span>${escapeHtml(change.status)}</span>
+    <button class="card" data-uri="${escapeHtml(change.openUri.toString())}">
+      <div class="card__top">
+        <strong>${escapeHtml(change.name)}</strong>
+        <span class="status">active</span>
+      </div>
+      <div class="pills">
+        ${renderPill('Proposal', 'proposal', hasProposal)}
+        ${renderPill('Design', 'design', hasDesign)}
+        ${renderPill('Tasks', 'tasks', hasTasks)}
+        ${renderPill('Specs', 'specs', hasSpecs)}
+      </div>
+      <div class="progress-meta">
+        <span>${change.taskProgress.completed}/${change.taskProgress.total} tasks</span>
+        <span>${progress}%</span>
+      </div>
+      <div class="progress" aria-hidden="true">
+        <div class="progress__bar" style="width:${progress}%"></div>
+      </div>
     </button>
   `;
 }
@@ -108,8 +151,100 @@ function renderHtml(changes: ChangeSummary[], cspSource: string, nonce: string):
           gap: 8px;
           align-items: center;
         }
+        .card {
+          width: 100%;
+          text-align: left;
+          border: 1px solid var(--vscode-panel-border);
+          background: color-mix(in srgb, var(--vscode-sideBar-background) 88%, var(--vscode-editor-background));
+          color: inherit;
+          border-radius: 12px;
+          padding: 10px;
+          cursor: pointer;
+        }
+        .card:hover,
         .row:hover {
           border-color: var(--vscode-focusBorder);
+        }
+        .card__top,
+        .progress-meta {
+          display: flex;
+          justify-content: space-between;
+          gap: 8px;
+          align-items: center;
+        }
+        .card__top {
+          margin-bottom: 8px;
+        }
+        .status {
+          display: inline-flex;
+          align-items: center;
+          border-radius: 999px;
+          padding: 3px 8px;
+          font-size: 0.72rem;
+          color: var(--vscode-badge-foreground);
+          background: var(--vscode-badge-background);
+        }
+        .pills {
+          display: flex;
+          gap: 6px;
+          flex-wrap: wrap;
+          margin-bottom: 8px;
+        }
+        .pill {
+          display: inline-flex;
+          align-items: center;
+          border-radius: 999px;
+          padding: 2px 8px;
+          font-size: 0.72rem;
+          border: 1px solid transparent;
+        }
+        .pill--proposal {
+          color: var(--vscode-textLink-foreground);
+          background: color-mix(in srgb, var(--vscode-textLink-foreground) 16%, transparent);
+          border-color: color-mix(in srgb, var(--vscode-textLink-foreground) 35%, transparent);
+        }
+        .pill--design {
+          color: var(--vscode-gitDecoration-modifiedResourceForeground);
+          background: color-mix(in srgb, var(--vscode-gitDecoration-modifiedResourceForeground) 16%, transparent);
+          border-color: color-mix(in srgb, var(--vscode-gitDecoration-modifiedResourceForeground) 35%, transparent);
+        }
+        .pill--tasks {
+          color: var(--vscode-list-warningForeground);
+          background: color-mix(in srgb, var(--vscode-list-warningForeground) 16%, transparent);
+          border-color: color-mix(in srgb, var(--vscode-list-warningForeground) 35%, transparent);
+        }
+        .pill--specs {
+          color: var(--vscode-testing-iconPassed);
+          background: color-mix(in srgb, var(--vscode-testing-iconPassed) 16%, transparent);
+          border-color: color-mix(in srgb, var(--vscode-testing-iconPassed) 35%, transparent);
+        }
+        .pill--muted {
+          color: var(--vscode-descriptionForeground);
+          background: transparent;
+          border-color: var(--vscode-panel-border);
+        }
+        .progress-meta {
+          margin-bottom: 6px;
+          font-size: 0.75rem;
+          color: var(--vscode-descriptionForeground);
+        }
+        .progress {
+          height: 6px;
+          border-radius: 999px;
+          background: color-mix(in srgb, var(--vscode-panel-border) 55%, transparent);
+          overflow: hidden;
+        }
+        .progress__bar {
+          height: 100%;
+          border-radius: 999px;
+          background: linear-gradient(
+            90deg,
+            var(--vscode-textLink-foreground),
+            var(--vscode-testing-iconPassed)
+          );
+        }
+        .row--archive {
+          background: color-mix(in srgb, var(--vscode-sideBar-background) 94%, transparent);
         }
         .row--muted {
           opacity: 0.7;
