@@ -14,12 +14,14 @@ export interface ParsedSpec {
   readonly title: string;
   readonly status: SpecStatus;
   readonly rawText: string;
+  readonly scenarioCount: number;
   readonly sections: Record<SpecSectionName, string>;
   readonly taskProgress: SpecTaskProgress;
 }
 
 const headingPattern = /^\s{0,3}(#{1,6})\s+(.*?)\s*$/;
 const checkboxPattern = /^[-*]\s+\[( |x|X)\]\s+/gm;
+const scenarioPattern = /^\s{0,3}####\s+Scenario\s*:?.*$/gim;
 
 function toTitleCaseSlug(value: string): string {
   return value
@@ -50,6 +52,10 @@ export function countTaskProgress(text: string): SpecTaskProgress {
     completed: taskMatches.filter((entry) => /\[x\]/i.test(entry)).length,
     total: taskMatches.length,
   };
+}
+
+export function countScenarios(text: string): number {
+  return text.match(scenarioPattern)?.length ?? 0;
 }
 
 export function looksLikeSpec(filePath: string, text: string): boolean {
@@ -99,6 +105,7 @@ export function parseSpecText(filePath: string, text: string): ParsedSpec {
     title,
     status: isArchivePath(filePath) ? 'archive' : 'active',
     rawText: text.trim(),
+    scenarioCount: countScenarios(text),
     sections,
     taskProgress,
   };

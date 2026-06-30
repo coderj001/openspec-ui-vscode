@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { specSectionNames } from '../specs/parser';
 import { ChangeDocument, readChangeDocument, readSpecDocument, SpecDocument } from '../specs/service';
-import { isChangeFilePath } from '../specs/paths';
+import { getSpecFolderName, isChangeFilePath } from '../specs/paths';
 
 class OpenspecDocument implements vscode.CustomDocument {
   public constructor(public readonly uri: vscode.Uri) {}
@@ -175,6 +175,12 @@ function renderChecklist(text: string): string {
   `;
 }
 
+function renderScenarioPill(spec: SpecDocument): string {
+  const label = `${spec.scenarioCount} scenario${spec.scenarioCount === 1 ? '' : 's'}`;
+
+  return `<span class="scenario-pill">${escapeHtml(label)}</span>`;
+}
+
 function renderSpecsPanel(change: ChangeDocument): string {
   const selectedSpecUri = change.selectedSpecUri?.toString() ?? change.specs[0]?.uri.toString() ?? '';
 
@@ -195,7 +201,10 @@ function renderSpecsPanel(change: ChangeDocument): string {
               role="tab"
               aria-selected="${selected ? 'true' : 'false'}"
             >
-              <strong>${escapeHtml(spec.title)}</strong>
+              <div class="spec-nav__top">
+                <strong>${escapeHtml(getSpecFolderName(spec.uri.fsPath) ?? spec.title)}</strong>
+                ${renderScenarioPill(spec)}
+              </div>
               <span>${escapeHtml(spec.uri.fsPath.replace(`${change.folderUri.fsPath}/`, ''))}</span>
             </button>
           `;
@@ -378,11 +387,29 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           border-radius: 10px;
           padding: 10px;
           cursor: pointer;
+          position: relative;
+          overflow: hidden;
+        }
+        .spec-nav__top {
+          display: flex;
+          gap: 8px;
+          align-items: start;
+          justify-content: space-between;
         }
         .spec-nav__item.active {
           border-color: var(--vscode-focusBorder);
           background: var(--vscode-list-activeSelectionBackground);
           color: var(--vscode-list-activeSelectionForeground);
+          box-shadow:
+            inset 4px 0 0 var(--vscode-focusBorder),
+            0 0 0 1px var(--vscode-focusBorder);
+        }
+        .spec-nav__item.active::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(90deg, rgba(255,255,255,0.04), transparent 28%);
+          pointer-events: none;
         }
         .spec-nav__item span {
           display: block;
@@ -393,6 +420,22 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
         .spec-nav__item.active span {
           color: inherit;
           opacity: 0.85;
+        }
+        .spec-nav__item.active .scenario-pill {
+          background: var(--vscode-button-background);
+          color: var(--vscode-button-foreground);
+          border-color: var(--vscode-button-border);
+        }
+        .scenario-pill {
+          display: inline-flex;
+          align-items: center;
+          border-radius: 999px;
+          padding: 2px 8px;
+          font-size: 0.72rem;
+          white-space: nowrap;
+          border: 1px solid var(--vscode-panel-border);
+          background: var(--vscode-badge-background);
+          color: var(--vscode-badge-foreground);
         }
         .spec-detail {
           min-width: 0;

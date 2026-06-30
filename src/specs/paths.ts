@@ -49,3 +49,14 @@ export function getChangeRootPath(filePath: string): string | null {
 
   return segments.slice(0, changesIndex + 2).join(path.sep);
 }
+
+export function getSpecFolderName(filePath: string): string | null {
+  const segments = normalize(filePath).split('/');
+  const specsIndex = segments.lastIndexOf('specs');
+
+  if (specsIndex === -1 || specsIndex + 1 >= segments.length) {
+    return null;
+  }
+
+  return segments[specsIndex + 1] ?? null;
+}

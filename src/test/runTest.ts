@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import { parseSpecText, looksLikeSpec } from '../specs/parser';
-import { getChangeFolderName, isChangeFilePath, isChangeSpecPath, isSourceSpecPath } from '../specs/paths';
+import { getChangeFolderName, getSpecFolderName, isChangeFilePath, isChangeSpecPath, isSourceSpecPath } from '../specs/paths';
 
 async function main(): Promise<void> {
   try {
@@ -16,6 +16,12 @@ async function main(): Promise<void> {
         '- [x] first',
         '- [ ] second',
         '',
+        '#### Scenario: First',
+        'One',
+        '',
+        '#### Scenario: Second',
+        'Two',
+        '',
         '## Specs',
         'Details here.',
       ].join('\n'),
@@ -24,6 +30,7 @@ async function main(): Promise<void> {
     assert.strictEqual(parsed.title, 'Sample Spec');
     assert.strictEqual(parsed.rawText.includes('Ship it.'), true);
     assert.strictEqual(parsed.sections.Proposal, 'Ship it.');
+    assert.strictEqual(parsed.scenarioCount, 2);
     assert.strictEqual(parsed.taskProgress.total, 2);
     assert.strictEqual(parsed.taskProgress.completed, 1);
     assert.strictEqual(looksLikeSpec('/workspace/specs/sample.md', '# Proposal\ncontent'), true);
@@ -32,6 +39,7 @@ async function main(): Promise<void> {
     assert.strictEqual(isChangeFilePath('/workspace/openspec/changes/add-views/proposal.md'), true);
     assert.strictEqual(isChangeSpecPath('/workspace/openspec/changes/add-views/specs/core/spec.md'), true);
     assert.strictEqual(getChangeFolderName('/workspace/openspec/changes/add-views/specs/core/spec.md'), 'add-views');
+    assert.strictEqual(getSpecFolderName('/workspace/openspec/changes/add-views/specs/catalog-management/spec.md'), 'catalog-management');
     assert.strictEqual(parseSpecText('/workspace/openspec/changes/archive/add-views/specs/core/spec.md', '# Archived').status, 'archive');
 
     console.log('test: ok');
