@@ -11,7 +11,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerWebviewViewProvider(OpenspecSidebarViewProvider.viewType, dashboard),
     vscode.window.registerCustomEditorProvider(
       OpenspecSpecEditorProvider.viewType,
-      new OpenspecSpecEditorProvider(),
+      new OpenspecSpecEditorProvider(context.extensionUri),
       {
         webviewOptions: {
           retainContextWhenHidden: true,

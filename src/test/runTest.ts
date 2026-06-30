@@ -1,6 +1,6 @@
 import { formatCommentExport, getCommentFileLabel } from '../editors/comment-export';
 import * as assert from 'assert';
-import { renderMarkdown } from '../editors/markdown';
+import { renderCommentableMarkdown, renderMarkdown } from '../editors/markdown';
 import { resolveOpenFileUri } from '../editors/open-file-target';
 import { parseSpecText, looksLikeSpec } from '../specs/parser';
 import { formatArchiveName, getChangeFolderName, getChangeRootPath, getSpecFolderName, isChangeFilePath, isChangeSpecPath, isSourceSpecPath } from '../specs/paths';
@@ -52,6 +52,26 @@ async function main(): Promise<void> {
     assert.strictEqual(renderMarkdown('# Title\n\n- item\n\n`code` **bold**').includes('<h1 class="md-heading md-heading--1">Title</h1>'), true);
     assert.strictEqual(renderMarkdown('# Title\n\n- item\n\n`code` **bold**').includes('<code>code</code>'), true);
     assert.strictEqual(renderMarkdown('- [x] done').includes('md-list__marker--task'), true);
+    assert.strictEqual(
+      renderCommentableMarkdown('```mermaid\ngraph TD\nA-->B\n```').includes('<pre class="md-mermaid__source" data-mermaid-source hidden>graph TD\nA--&gt;B</pre>'),
+      true,
+    );
+    assert.strictEqual(
+      renderCommentableMarkdown('```mermaid\ngraph TD\nA-->B\n```').includes('data-line="1"'),
+      true,
+    );
+    assert.strictEqual(
+      renderCommentableMarkdown('```ts\nconst x = 1;\n```').includes('md-code-fence'),
+      true,
+    );
+    assert.strictEqual(
+      renderCommentableMarkdown('```mermaid\ngraph TD\nA-->B\n  ```\nAfter').includes('After'),
+      true,
+    );
+    assert.strictEqual(
+      renderCommentableMarkdown('```mermaid\ngraph TD\nA-->B\n  ```\nAfter').includes('<pre class="md-mermaid__source" data-mermaid-source hidden>graph TD\nA--&gt;B</pre>'),
+      true,
+    );
     assert.strictEqual(getCommentFileLabel('/workspace/openspec/changes/add-views/design.md'), 'design.md');
     assert.strictEqual(getCommentFileLabel('/workspace/openspec/changes/add-views/specs/catalog-management/spec.md'), 'catalog-management/spec.md');
     assert.strictEqual(formatCommentExport([

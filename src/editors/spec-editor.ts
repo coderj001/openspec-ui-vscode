@@ -72,6 +72,75 @@ function renderHeaderActions(currentUri: string): string {
   `;
 }
 
+function getEditorChrome(cspSource: string, nonce: string): string {
+  return `
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}' ${cspSource};">
+  `;
+}
+
+function getMermaidBootScript(): string {
+  return `
+        const resolveMermaidApi = () => {
+          const bundled = globalThis.__esbuild_esm_mermaid_nm?.mermaid;
+          const direct = globalThis.mermaid;
+          return bundled?.default || bundled || direct?.default || direct || null;
+        };
+
+        const renderMermaidDiagrams = async () => {
+          const mermaidApi = resolveMermaidApi();
+          const diagrams = [...document.querySelectorAll('.md-mermaid')];
+
+          if (!mermaidApi) {
+            diagrams.forEach((diagram) => {
+              const preview = diagram.querySelector('[data-mermaid-preview]');
+              const fallback = diagram.querySelector('[data-mermaid-fallback]');
+              if (preview) {
+                preview.innerHTML = '<div class="md-mermaid__error">Mermaid failed to load</div>';
+              }
+              if (fallback) {
+                fallback.hidden = false;
+              }
+            });
+            return;
+          }
+
+          mermaidApi.initialize({
+            startOnLoad: false,
+            securityLevel: 'strict',
+            theme: document.body.classList.contains('vscode-dark') ? 'dark' : 'default',
+          });
+
+          for (const [index, diagram] of diagrams.entries()) {
+            const sourceNode = diagram.querySelector('[data-mermaid-source]');
+            const source = sourceNode?.textContent || '';
+            const preview = diagram.querySelector('[data-mermaid-preview]');
+            const fallback = diagram.querySelector('[data-mermaid-fallback]');
+            if (!preview) {
+              continue;
+            }
+
+            try {
+              const result = await mermaidApi.render('openspec-mermaid-' + index + '-' + Date.now(), source);
+              preview.innerHTML = result.svg;
+              if (fallback) {
+                fallback.hidden = true;
+              }
+            } catch (error) {
+              const message = error instanceof Error
+                ? error.message
+                : typeof error === 'string'
+                  ? error
+                  : 'Invalid mermaid diagram';
+              preview.innerHTML = '<div class="md-mermaid__error">Invalid mermaid diagram: ' + message.replace(/[&<>]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char] || char)) + '</div>';
+              if (fallback) {
+                fallback.hidden = false;
+              }
+            }
+          }
+        };
+  `;
+}
+
 function renderSpecSections(spec: SpecDocument, includeEmpty: boolean): string {
   const sections = specSectionNames
     .filter((section) => includeEmpty || spec.sections[section])
@@ -110,7 +179,7 @@ function renderEmbeddedSpecBody(spec: SpecDocument): string {
   return renderSpecSections(spec, false);
 }
 
-function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string): string {
+function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string, mermaidScriptUri: string): string {
   const currentUri = resolveOpenFileUri(spec) ?? '';
   const commentOwnerLabel = getSpecFolderName(spec.uri.fsPath) ?? spec.title;
   const commentFileLabel = getCommentFileLabel(spec.uri.fsPath);
@@ -121,8 +190,8 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string):
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource};">
-      <style>
+      ${getEditorChrome(cspSource, nonce)}
+      <style nonce="${nonce}">
         :root {
           color-scheme: var(--vscode-color-scheme);
         }
@@ -478,14 +547,43 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string):
           line-height: 1.5;
           word-break: break-word;
         }
+        .md-mermaid {
+          display: grid;
+          gap: 10px;
+          width: 100%;
+        }
+        .md-mermaid__preview {
+          padding: 12px;
+          border-radius: 10px;
+          border: 1px solid var(--vscode-panel-border);
+          background: var(--vscode-editorWidget-background);
+          overflow: auto;
+        }
+        .md-mermaid__preview svg {
+          display: block;
+          max-width: 100%;
+          height: auto;
+        }
+        .md-mermaid__fallback[hidden] {
+          display: none;
+        }
+        .md-mermaid__source[hidden] {
+          display: none;
+        }
+        .md-mermaid__error {
+          color: var(--vscode-errorForeground);
+          font-weight: 600;
+        }
       </style>
     </head>
     <body>
       <main class="shell">
         ${renderSourceSpecBody(spec)}
       </main>
+      <script nonce="${nonce}" src="${mermaidScriptUri}"></script>
       <script nonce="${nonce}">
         const vscode = acquireVsCodeApi();
+        ${getMermaidBootScript()}
         const openFileButton = document.querySelector('[data-action="open-file"]');
         const copyCommentsButton = document.querySelector('[data-action="copy-comments"]');
         const refreshButton = document.querySelector('[data-action="refresh-view"]');
@@ -598,6 +696,7 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string):
           });
         }
         renderCommentState();
+        void renderMermaidDiagrams();
       </script>
     </body>
     </html>
@@ -658,7 +757,7 @@ function renderSpecsPanel(change: ChangeDocument): string {
   `;
 }
 
-function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: string): string {
+function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: string, mermaidScriptUri: string): string {
   const tabs = [
     { id: 'proposal', label: 'Proposal' },
     { id: 'design', label: 'Design' },
@@ -698,7 +797,7 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
+      ${getEditorChrome(cspSource, nonce)}
       <style nonce="${nonce}">
         :root {
           color-scheme: var(--vscode-color-scheme);
@@ -1148,6 +1247,33 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           line-height: 1.5;
           word-break: break-word;
         }
+        .md-mermaid {
+          display: grid;
+          gap: 10px;
+          width: 100%;
+        }
+        .md-mermaid__preview {
+          padding: 12px;
+          border-radius: 10px;
+          border: 1px solid var(--vscode-panel-border);
+          background: var(--vscode-editorWidget-background);
+          overflow: auto;
+        }
+        .md-mermaid__preview svg {
+          display: block;
+          max-width: 100%;
+          height: auto;
+        }
+        .md-mermaid__fallback[hidden] {
+          display: none;
+        }
+        .md-mermaid__source[hidden] {
+          display: none;
+        }
+        .md-mermaid__error {
+          color: var(--vscode-errorForeground);
+          font-weight: 600;
+        }
         @media (max-width: 820px) {
           .spec-split {
             grid-template-columns: 1fr;
@@ -1191,8 +1317,10 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           ${renderSpecsPanel(change)}
         </section>
       </main>
+      <script nonce="${nonce}" src="${mermaidScriptUri}"></script>
       <script nonce="${nonce}">
         const vscode = acquireVsCodeApi();
+        ${getMermaidBootScript()}
         const tabs = [...document.querySelectorAll('.tab')];
         const panels = [...document.querySelectorAll('.panel')];
         const specItems = [...document.querySelectorAll('[data-spec-target]')];
@@ -1374,6 +1502,7 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           });
         });
         renderCommentState();
+        void renderMermaidDiagrams();
       </script>
     </body>
     </html>
@@ -1383,6 +1512,8 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
 export class OpenspecSpecEditorProvider implements vscode.CustomReadonlyEditorProvider<OpenspecDocument> {
   public static readonly viewType = 'openspec.specEditor';
 
+  public constructor(private readonly extensionUri: vscode.Uri) {}
+
   public async openCustomDocument(uri: vscode.Uri): Promise<OpenspecDocument> {
     return new OpenspecDocument(uri);
   }
@@ -1390,22 +1521,25 @@ export class OpenspecSpecEditorProvider implements vscode.CustomReadonlyEditorPr
   public async resolveCustomEditor(document: OpenspecDocument, webviewPanel: vscode.WebviewPanel): Promise<void> {
     webviewPanel.webview.options = {
       enableScripts: true,
-      localResourceRoots: [],
+      localResourceRoots: [this.extensionUri],
     };
+    const mermaidScriptUri = webviewPanel.webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'mermaid', 'dist', 'mermaid.min.js'),
+    ).toString();
 
     const render = async (): Promise<void> => {
       if (isChangeFilePath(document.uri.fsPath)) {
         const change = await readChangeDocument(document.uri);
         const nonce = `${Date.now()}${Math.random().toString(16).slice(2)}`;
         webviewPanel.webview.html = change
-          ? renderChangeEditor(change, webviewPanel.webview.cspSource, nonce)
+          ? renderChangeEditor(change, webviewPanel.webview.cspSource, nonce, mermaidScriptUri)
           : '<html><body><p>Not an Openspec change document.</p></body></html>';
         return;
       }
 
       const spec = await readSpecDocument(document.uri);
       webviewPanel.webview.html = spec
-        ? renderSourceSpec(spec, webviewPanel.webview.cspSource, `${Date.now()}${Math.random().toString(16).slice(2)}`)
+        ? renderSourceSpec(spec, webviewPanel.webview.cspSource, `${Date.now()}${Math.random().toString(16).slice(2)}`, mermaidScriptUri)
         : '<html><body><p>Not an Openspec document.</p></body></html>';
     };
 

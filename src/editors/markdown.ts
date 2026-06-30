@@ -104,9 +104,10 @@ export function renderMarkdown(text: string): string {
 
   for (const rawLine of lines) {
     const line = rawLine.trimEnd();
+    const fenceLine = rawLine.trim();
 
     if (inCode) {
-      if (/^```/.test(line)) {
+      if (/^```/.test(fenceLine)) {
         flushCode();
       } else {
         codeLines.push(rawLine);
@@ -115,7 +116,7 @@ export function renderMarkdown(text: string): string {
       continue;
     }
 
-    const fenceMatch = line.match(/^```(\w+)?\s*$/);
+    const fenceMatch = fenceLine.match(/^```(\w+)?\s*$/);
     if (fenceMatch) {
       flushParagraph();
       flushList();
@@ -212,18 +213,36 @@ function renderCommentLine(lineNumber: number, body: string, extraClass = ''): s
   `;
 }
 
+function renderMermaidBlock(lineNumber: number, source: string): string {
+  const escapedSource = escapeHtml(source);
+
+  return renderCommentLine(
+    lineNumber,
+    `
+      <div class="md-mermaid">
+        <div class="md-mermaid__preview" data-mermaid-preview>Rendering diagram...</div>
+        <pre class="md-mermaid__source" data-mermaid-source hidden>${escapedSource}</pre>
+        <pre class="md-code md-mermaid__fallback" data-mermaid-fallback hidden><code>${escapedSource}</code></pre>
+      </div>
+    `,
+    'md-line--diagram',
+  );
+}
+
 export function renderCommentableMarkdown(text: string): string {
   const lines = text.replace(/\r\n/g, '\n').split('\n');
   const rendered: string[] = [];
   let inCode = false;
   let codeLang = '';
 
-  for (const [index, rawLine] of lines.entries()) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const rawLine = lines[index];
     const lineNumber = index + 1;
     const line = rawLine.trimEnd();
+    const fenceLine = rawLine.trim();
 
     if (inCode) {
-      if (/^```/.test(line)) {
+      if (/^```/.test(fenceLine)) {
         rendered.push(renderCommentLine(lineNumber, '<div class="md-code-fence">```</div>', 'md-line--code'));
         inCode = false;
         codeLang = '';
@@ -238,8 +257,21 @@ export function renderCommentableMarkdown(text: string): string {
       continue;
     }
 
-    const fenceMatch = line.match(/^```(\w+)?\s*$/);
+    const fenceMatch = fenceLine.match(/^```(\w+)?\s*$/);
     if (fenceMatch) {
+      if ((fenceMatch[1] ?? '').toLowerCase() === 'mermaid') {
+        const mermaidLines: string[] = [];
+        index += 1;
+
+        while (index < lines.length && !/^```/.test(lines[index].trim())) {
+          mermaidLines.push(lines[index]);
+          index += 1;
+        }
+
+        rendered.push(renderMermaidBlock(lineNumber, mermaidLines.join('\n')));
+        continue;
+      }
+
       inCode = true;
       codeLang = fenceMatch[1] ?? '';
       rendered.push(renderCommentLine(lineNumber, `<div class="md-code-fence">\`\`\`<span>${escapeHtml(codeLang)}</span></div>`, 'md-line--code'));
