@@ -265,13 +265,13 @@ function getMermaidBootScript(): string {
             }
           \`;
           svg.append(style);
-          applyInline('text.actor, .actor + text, .nodeLabel, .nodeLabel *, .labelText, .labelText *', {
+          applyInline('text.actor, text.actor > tspan, .actor + text, .actor + text > tspan, .nodeLabel, .nodeLabel *, .labelText, .labelText *, .labelText > tspan', {
             fill: cardText,
             color: cardText,
             'text-anchor': 'middle',
             'dominant-baseline': 'middle',
           });
-          applyInline('rect.actor, .node rect, .node circle, .node ellipse, .node polygon, .node path', {
+          applyInline('rect.actor.actor-box, rect.actor.actor-top, rect.actor.actor-bottom, rect.actor, .node rect, .node circle, .node ellipse, .node polygon, .node path', {
             fill: cardBackground,
             stroke: border,
           });
