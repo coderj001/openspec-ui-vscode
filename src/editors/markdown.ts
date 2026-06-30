@@ -192,3 +192,103 @@ export function renderMarkdown(text: string): string {
 
   return blocks.join('') || '<p class="empty">No content yet</p>';
 }
+
+function renderCommentLine(lineNumber: number, body: string, extraClass = ''): string {
+  return `
+    <div class="md-line${extraClass ? ` ${extraClass}` : ''}" data-line="${lineNumber}">
+      <div class="md-line__gutter">
+        <button type="button" class="md-line__comment-trigger" data-comment-trigger aria-label="Add comment to line ${lineNumber}">
+          <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+            <path d="M4 5h16v10H8l-4 4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="md-line__main">
+        <div class="md-line__content">${body}</div>
+        <div class="md-line__composer" data-comment-composer></div>
+        <div class="md-line__comments" data-comment-list></div>
+      </div>
+    </div>
+  `;
+}
+
+export function renderCommentableMarkdown(text: string): string {
+  const lines = text.replace(/\r\n/g, '\n').split('\n');
+  const rendered: string[] = [];
+  let inCode = false;
+  let codeLang = '';
+
+  for (const [index, rawLine] of lines.entries()) {
+    const lineNumber = index + 1;
+    const line = rawLine.trimEnd();
+
+    if (inCode) {
+      if (/^```/.test(line)) {
+        rendered.push(renderCommentLine(lineNumber, '<div class="md-code-fence">```</div>', 'md-line--code'));
+        inCode = false;
+        codeLang = '';
+      } else {
+        rendered.push(renderCommentLine(
+          lineNumber,
+          `<pre class="md-code md-code--line"><code${codeLang ? ` data-lang="${escapeHtml(codeLang)}"` : ''}>${escapeHtml(rawLine)}</code></pre>`,
+          'md-line--code',
+        ));
+      }
+
+      continue;
+    }
+
+    const fenceMatch = line.match(/^```(\w+)?\s*$/);
+    if (fenceMatch) {
+      inCode = true;
+      codeLang = fenceMatch[1] ?? '';
+      rendered.push(renderCommentLine(lineNumber, `<div class="md-code-fence">\`\`\`<span>${escapeHtml(codeLang)}</span></div>`, 'md-line--code'));
+      continue;
+    }
+
+    if (!line.trim()) {
+      continue;
+    }
+
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const headingText = renderInlineMarkdown(headingMatch[2].trim());
+      const headingClass = level === 4 && /^scenario\s*:/i.test(headingMatch[2]) ? ' md-heading--scenario' : '';
+      rendered.push(renderCommentLine(lineNumber, `<h${level} class="md-heading md-heading--${level}${headingClass}">${headingText}</h${level}>`));
+      continue;
+    }
+
+    const quoteMatch = line.match(/^>\s?(.*)$/);
+    if (quoteMatch) {
+      rendered.push(renderCommentLine(lineNumber, `<blockquote class="md-quote"><p>${renderInlineMarkdown(quoteMatch[1])}</p></blockquote>`));
+      continue;
+    }
+
+    const listMatch = line.match(/^(\d+\.|[-*])\s+(.*)$/);
+    if (listMatch) {
+      const marker = listMatch[1];
+      const taskMatch = listMatch[2].match(/^\[( |x|X)\]\s+(.*)$/);
+      const kind = taskMatch
+        ? 'task'
+        : /^\d+\./.test(marker)
+          ? 'ordered'
+          : 'bullet';
+      const body = taskMatch ? taskMatch[2] : listMatch[2];
+      const markerHtml = renderListMarker(
+        kind,
+        Boolean(taskMatch && taskMatch[1].toLowerCase() === 'x'),
+        kind === 'ordered' ? Number.parseInt(marker, 10) : 0,
+      );
+      rendered.push(renderCommentLine(
+        lineNumber,
+        `<div class="md-list__item md-list__item--${kind}">${markerHtml}<span class="md-list__body">${renderInlineMarkdown(body)}</span></div>`,
+      ));
+      continue;
+    }
+
+    rendered.push(renderCommentLine(lineNumber, `<p>${renderInlineMarkdown(line)}</p>`));
+  }
+
+  return rendered.join('') || '<p class="empty">No content yet</p>';
+}

@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { renderMarkdown } from './markdown';
+import { getCommentFileLabel } from './comment-export';
+import { renderCommentableMarkdown } from './markdown';
 import { resolveOpenFileUri } from './open-file-target';
 import { specSectionNames } from '../specs/parser';
 import { ChangeDocument, readChangeDocument, readSpecDocument, SpecDocument } from '../specs/service';
@@ -27,6 +28,9 @@ function renderIcon(name: string): string {
     specs: 'M6 4h12v16H6z M9 8h6M9 12h6M9 16h4',
     markdown: 'M5 6h14M5 10h8M5 14h12M5 18h8',
     file: 'M7 3h7l4 4v14H7z M14 3v4h4',
+    comment: 'M4 5h16v10H8l-4 4z',
+    copy: 'M9 9h10v12H9z M5 3h10v12H5z',
+    refresh: 'M18 8V4m0 0h-4m4 0-3 3M6 16v4m0 0h4m-4 0 3-3M7.5 8.5A5 5 0 0 1 16 7m.5 8.5A5 5 0 0 1 8 17',
   };
 
   return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[name] ?? paths.markdown}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -36,7 +40,7 @@ function renderSection(name: string, content: string): string {
   return `
     <section class="source-section">
       <h2 class="source-section__title">${renderIcon('markdown')}${escapeHtml(name)}</h2>
-      ${content ? renderMarkdown(content) : '<p class="empty">No content yet</p>'}
+      ${content ? renderCommentableMarkdown(content) : '<p class="empty">No content yet</p>'}
     </section>
   `;
 }
@@ -44,8 +48,27 @@ function renderSection(name: string, content: string): string {
 function renderRawSpec(spec: SpecDocument): string {
   return `
     <section class="source-section">
-      ${spec.rawText ? renderMarkdown(spec.rawText) : '<p class="empty">No content yet</p>'}
+      ${spec.rawText ? renderCommentableMarkdown(spec.rawText) : '<p class="empty">No content yet</p>'}
     </section>
+  `;
+}
+
+function renderHeaderActions(currentUri: string): string {
+  return `
+    <div class="actions">
+      <button type="button" class="action" data-action="copy-comments">
+        ${renderIcon('copy')}
+        <span>Copy Comments</span>
+      </button>
+      <button type="button" class="action" data-action="open-file" data-uri="${escapeHtml(currentUri)}" ${currentUri ? '' : 'disabled'}>
+        ${renderIcon('file')}
+        <span>Open File</span>
+      </button>
+      <button type="button" class="action" data-action="refresh-view">
+        ${renderIcon('refresh')}
+        <span>Refresh</span>
+      </button>
+    </div>
   `;
 }
 
@@ -60,6 +83,7 @@ function renderSpecSections(spec: SpecDocument, includeEmpty: boolean): string {
 
 function renderSourceSpecBody(spec: SpecDocument): string {
   const progress = spec.taskProgress.total === 0 ? 0 : Math.round((spec.taskProgress.completed / spec.taskProgress.total) * 100);
+  const currentUri = resolveOpenFileUri(spec) ?? '';
 
   return `
     <div class="hero hero--source">
@@ -68,10 +92,7 @@ function renderSourceSpecBody(spec: SpecDocument): string {
         <p class="meta">${escapeHtml(spec.uri.fsPath)}</p>
         <span class="pill">${escapeHtml(spec.status)} · ${progress}% tasks done</span>
       </div>
-      <button type="button" class="action" data-action="open-file" data-uri="${escapeHtml(spec.uri.toString())}">
-        ${renderIcon('file')}
-        <span>Open File</span>
-      </button>
+      ${renderHeaderActions(currentUri)}
     </div>
     <section class="metrics">
       ${specSectionNames.map((section) => `
@@ -91,6 +112,8 @@ function renderEmbeddedSpecBody(spec: SpecDocument): string {
 
 function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string): string {
   const currentUri = resolveOpenFileUri(spec) ?? '';
+  const commentOwnerLabel = getSpecFolderName(spec.uri.fsPath) ?? spec.title;
+  const commentFileLabel = getCommentFileLabel(spec.uri.fsPath);
 
   return /* html */ `
     <!doctype html>
@@ -120,6 +143,12 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string):
           gap: 12px;
           align-items: flex-start;
           margin-bottom: 16px;
+        }
+        .actions {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
         }
         .shell,
         .source-section,
@@ -203,7 +232,7 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string):
           color: var(--vscode-descriptionForeground);
         }
         .md-heading {
-          margin: 1.1em 0 0.45em;
+          margin: 0;
           line-height: 1.2;
         }
         .md-heading--1 {
@@ -230,7 +259,7 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string):
           display: flex;
           gap: 10px;
           align-items: flex-start;
-          margin: 0 0 0.7em;
+          margin: 0;
           transition: transform 120ms ease, color 120ms ease;
         }
         .md-list__item:hover {
@@ -274,25 +303,35 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string):
           flex: 1 1 auto;
         }
         .md-quote {
-          margin: 0.75em 0 0;
+          margin: 0;
           padding: 0.1em 0 0.1em 1em;
           border-left: 3px solid var(--vscode-panel-border);
           color: var(--vscode-descriptionForeground);
         }
         .md-code {
-          margin: 0.75em 0 0;
+          margin: 0;
           padding: 12px 14px;
           border-radius: 10px;
           overflow-x: auto;
           background: var(--vscode-editorWidget-background);
           border: 1px solid var(--vscode-panel-border);
         }
+        .md-code--line {
+          padding: 8px 12px;
+        }
+        .md-code-fence {
+          display: inline-flex;
+          gap: 8px;
+          align-items: center;
+          color: var(--vscode-descriptionForeground);
+          font-family: var(--vscode-editor-font-family);
+        }
         .md-code code {
           font-family: var(--vscode-editor-font-family);
           font-size: var(--vscode-editor-font-size);
         }
         p {
-          margin: 0.75em 0 0;
+          margin: 0;
           line-height: 1.6;
         }
         a {
@@ -318,6 +357,127 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string):
           font-size: var(--vscode-editor-font-size);
           line-height: 1.55;
         }
+        .md-line {
+          display: grid;
+          grid-template-columns: 56px minmax(0, 1fr);
+          gap: 12px;
+          align-items: start;
+          padding: 1px 0;
+        }
+        .md-line:hover .md-line__comment-trigger,
+        .md-line--active .md-line__comment-trigger {
+          opacity: 1;
+          transform: scale(1);
+        }
+        .md-line__gutter {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 0;
+          min-height: 28px;
+          padding-top: 3px;
+        }
+        .md-line__comment-trigger {
+          opacity: 0;
+          transform: scale(0.92);
+          width: 22px;
+          height: 22px;
+          padding: 0;
+          border-radius: 999px;
+          border: 1px solid var(--vscode-panel-border);
+          background: var(--vscode-editorWidget-background);
+          color: var(--vscode-descriptionForeground);
+          cursor: pointer;
+          transition: opacity 120ms ease, transform 120ms ease, border-color 120ms ease;
+        }
+        .md-line__comment-trigger:hover,
+        .md-line__comment-trigger:focus-visible {
+          border-color: var(--vscode-focusBorder);
+          color: var(--vscode-textLink-foreground);
+        }
+        .md-line__comment-trigger svg {
+          width: 14px;
+          height: 14px;
+        }
+        .md-line__main {
+          min-width: 0;
+        }
+        .md-line__content {
+          min-height: 28px;
+          display: flex;
+          align-items: center;
+        }
+        .md-line__content > * {
+          width: 100%;
+        }
+        .md-line + .md-line {
+          margin-top: 2px;
+        }
+        .md-line__spacer {
+          min-height: 1.2em;
+        }
+        .md-line__composer,
+        .md-line__comments {
+          margin-top: 8px;
+        }
+        .md-comment-composer {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          padding: 10px 12px;
+          border-radius: 10px;
+          border: 1px solid var(--vscode-panel-border);
+          background: var(--vscode-editorWidget-background);
+        }
+        .md-comment-composer input {
+          min-width: 0;
+          flex: 1 1 auto;
+          border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+          border-radius: 6px;
+          background: var(--vscode-input-background);
+          color: var(--vscode-input-foreground);
+          padding: 7px 10px;
+          font: inherit;
+        }
+        .md-comment-composer button,
+        .md-comment-composer .ghost {
+          border: 1px solid var(--vscode-panel-border);
+          border-radius: 6px;
+          padding: 7px 10px;
+          cursor: pointer;
+        }
+        .md-comment-composer button {
+          background: var(--vscode-button-background);
+          color: var(--vscode-button-foreground);
+        }
+        .md-comment-composer .ghost {
+          background: var(--vscode-button-secondaryBackground);
+          color: var(--vscode-button-secondaryForeground);
+        }
+        .md-comment-list {
+          display: grid;
+          gap: 6px;
+        }
+        .md-comment {
+          display: flex;
+          gap: 8px;
+          align-items: flex-start;
+          padding: 10px 12px;
+          border-radius: 10px;
+          border: 1px solid var(--vscode-panel-border);
+          background: color-mix(in srgb, var(--vscode-textLink-foreground) 8%, var(--vscode-editorWidget-background));
+        }
+        .md-comment__icon {
+          width: 16px;
+          height: 16px;
+          color: var(--vscode-textLink-foreground);
+          flex: 0 0 auto;
+          margin-top: 2px;
+        }
+        .md-comment__text {
+          line-height: 1.5;
+          word-break: break-word;
+        }
       </style>
     </head>
     <body>
@@ -327,7 +487,89 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string):
       <script nonce="${nonce}">
         const vscode = acquireVsCodeApi();
         const openFileButton = document.querySelector('[data-action="open-file"]');
+        const copyCommentsButton = document.querySelector('[data-action="copy-comments"]');
+        const refreshButton = document.querySelector('[data-action="refresh-view"]');
         const currentUri = ${JSON.stringify(currentUri)};
+        const ownerLabel = ${JSON.stringify(commentOwnerLabel)};
+        const fileLabel = ${JSON.stringify(commentFileLabel)};
+        const comments = [];
+        let activeComposerKey = '';
+        const commentIcon = ${JSON.stringify(renderIcon('comment'))};
+        const escapeAttribute = (value) => value
+          .replace(/&/g, '&amp;')
+          .replace(/"/g, '&quot;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        const getLineKey = (fileUri, line) => fileUri + '#' + line;
+        const getLineMeta = (lineElement) => ({
+          fileUri: currentUri,
+          fileLabel,
+          ownerLabel,
+          line: Number(lineElement.getAttribute('data-line') || '0'),
+        });
+        const renderCommentState = () => {
+          document.querySelectorAll('.md-line').forEach((lineElement) => {
+            const meta = getLineMeta(lineElement);
+            const key = getLineKey(meta.fileUri, meta.line);
+            lineElement.classList.toggle('md-line--active', activeComposerKey === key);
+            const composer = lineElement.querySelector('[data-comment-composer]');
+            const commentList = lineElement.querySelector('[data-comment-list]');
+            const lineComments = comments.filter((comment) => comment.fileUri === meta.fileUri && comment.line === meta.line);
+            if (commentList) {
+              commentList.innerHTML = lineComments.length === 0
+                ? ''
+                : '<div class="md-comment-list">' + lineComments.map((comment) => '<div class="md-comment">' + commentIcon + '<div class="md-comment__text"></div></div>').join('') + '</div>';
+              if (commentList.firstElementChild) {
+                [...commentList.querySelectorAll('.md-comment__text')].forEach((node, index) => {
+                  node.textContent = lineComments[index]?.text || '';
+                });
+              }
+            }
+            if (composer) {
+              if (activeComposerKey !== key) {
+                composer.innerHTML = '';
+              } else {
+                composer.innerHTML = '<form class="md-comment-composer"><input type="text" maxlength="500" placeholder="Add comment" /><button type="submit">Add</button><button type="button" class="ghost">Cancel</button></form>';
+                const form = composer.querySelector('form');
+                const input = composer.querySelector('input');
+                const cancelButton = composer.querySelector('.ghost');
+                if (input) {
+                  input.focus();
+                }
+                if (cancelButton) {
+                  cancelButton.addEventListener('click', () => {
+                    activeComposerKey = '';
+                    renderCommentState();
+                  });
+                }
+                if (form && input) {
+                  form.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    const text = input.value.trim();
+                    if (!text) {
+                      return;
+                    }
+                    comments.push({ ...meta, text });
+                    activeComposerKey = '';
+                    renderCommentState();
+                  });
+                }
+              }
+            }
+          });
+        };
+        document.querySelectorAll('[data-comment-trigger]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const lineElement = button.closest('.md-line');
+            if (!lineElement) {
+              return;
+            }
+            const meta = getLineMeta(lineElement);
+            const key = getLineKey(meta.fileUri, meta.line);
+            activeComposerKey = activeComposerKey === key ? '' : key;
+            renderCommentState();
+          });
+        });
         if (openFileButton) {
           openFileButton.disabled = !currentUri;
           openFileButton.addEventListener('click', () => {
@@ -336,6 +578,26 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string):
             }
           });
         }
+        if (copyCommentsButton) {
+          copyCommentsButton.addEventListener('click', async () => {
+            const text = comments.map((comment) => comment.ownerLabel + ' > ' + comment.fileLabel + ' [L' + comment.line + '] -> ' + JSON.stringify(comment.text)).join('\n');
+            if (!text) {
+              return;
+            }
+            try {
+              await navigator.clipboard.writeText(text);
+              vscode.postMessage({ type: 'copiedComments' });
+            } catch {
+              vscode.postMessage({ type: 'copyCommentsText', text });
+            }
+          });
+        }
+        if (refreshButton) {
+          refreshButton.addEventListener('click', () => {
+            vscode.postMessage({ type: 'refreshView' });
+          });
+        }
+        renderCommentState();
       </script>
     </body>
     </html>
@@ -408,10 +670,26 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
     : `${change.taskProgress.completed}/${change.taskProgress.total}`;
   const currentUri = resolveOpenFileUri(change) ?? '';
   const fileTargets = {
-    proposal: change.proposal?.uri.toString() ?? '',
-    design: change.design?.uri.toString() ?? '',
-    tasks: change.tasks?.uri.toString() ?? '',
-    specs: change.selectedSpecUri?.toString() ?? change.specs[0]?.uri.toString() ?? '',
+    proposal: {
+      uri: change.proposal?.uri.toString() ?? '',
+      fileLabel: change.proposal?.uri ? getCommentFileLabel(change.proposal.uri.fsPath) : 'proposal.md',
+      ownerLabel: change.name,
+    },
+    design: {
+      uri: change.design?.uri.toString() ?? '',
+      fileLabel: change.design?.uri ? getCommentFileLabel(change.design.uri.fsPath) : 'design.md',
+      ownerLabel: change.name,
+    },
+    tasks: {
+      uri: change.tasks?.uri.toString() ?? '',
+      fileLabel: change.tasks?.uri ? getCommentFileLabel(change.tasks.uri.fsPath) : 'tasks.md',
+      ownerLabel: change.name,
+    },
+    specs: {
+      uri: change.selectedSpecUri?.toString() ?? change.specs[0]?.uri.toString() ?? '',
+      fileLabel: change.selectedSpecUri ? getCommentFileLabel(change.selectedSpecUri.fsPath) : change.specs[0] ? getCommentFileLabel(change.specs[0].uri.fsPath) : 'spec.md',
+      ownerLabel: change.name,
+    },
   };
 
   return /* html */ `
@@ -442,6 +720,12 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           gap: 12px;
           align-items: flex-start;
           margin-bottom: 18px;
+        }
+        .actions {
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          justify-content: flex-end;
         }
         .hero h1 {
           margin: 0 0 4px;
@@ -537,7 +821,7 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           color: var(--vscode-descriptionForeground);
         }
         .md-heading {
-          margin: 1.1em 0 0.45em;
+          margin: 0;
           line-height: 1.2;
         }
         .md-heading--1 {
@@ -564,7 +848,7 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           display: flex;
           gap: 10px;
           align-items: flex-start;
-          margin: 0 0 0.7em;
+          margin: 0;
           transition: transform 120ms ease, color 120ms ease;
         }
         .md-list__item:hover {
@@ -608,25 +892,35 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           flex: 1 1 auto;
         }
         .md-quote {
-          margin: 0.75em 0 0;
+          margin: 0;
           padding: 0.1em 0 0.1em 1em;
           border-left: 3px solid var(--vscode-panel-border);
           color: var(--vscode-descriptionForeground);
         }
         .md-code {
-          margin: 0.75em 0 0;
+          margin: 0;
           padding: 12px 14px;
           border-radius: 10px;
           overflow-x: auto;
           background: var(--vscode-editorWidget-background);
           border: 1px solid var(--vscode-panel-border);
         }
+        .md-code--line {
+          padding: 8px 12px;
+        }
+        .md-code-fence {
+          display: inline-flex;
+          gap: 8px;
+          align-items: center;
+          color: var(--vscode-descriptionForeground);
+          font-family: var(--vscode-editor-font-family);
+        }
         .md-code code {
           font-family: var(--vscode-editor-font-family);
           font-size: var(--vscode-editor-font-size);
         }
         p {
-          margin: 0.75em 0 0;
+          margin: 0;
           line-height: 1.6;
         }
         a {
@@ -733,6 +1027,127 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
         .spec-detail__panel.active {
           display: block;
         }
+        .md-line {
+          display: grid;
+          grid-template-columns: 56px minmax(0, 1fr);
+          gap: 12px;
+          align-items: start;
+          padding: 1px 0;
+        }
+        .md-line:hover .md-line__comment-trigger,
+        .md-line--active .md-line__comment-trigger {
+          opacity: 1;
+          transform: scale(1);
+        }
+        .md-line__gutter {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 0;
+          min-height: 28px;
+          padding-top: 3px;
+        }
+        .md-line__comment-trigger {
+          opacity: 0;
+          transform: scale(0.92);
+          width: 22px;
+          height: 22px;
+          padding: 0;
+          border-radius: 999px;
+          border: 1px solid var(--vscode-panel-border);
+          background: var(--vscode-editorWidget-background);
+          color: var(--vscode-descriptionForeground);
+          cursor: pointer;
+          transition: opacity 120ms ease, transform 120ms ease, border-color 120ms ease;
+        }
+        .md-line__comment-trigger:hover,
+        .md-line__comment-trigger:focus-visible {
+          border-color: var(--vscode-focusBorder);
+          color: var(--vscode-textLink-foreground);
+        }
+        .md-line__comment-trigger svg {
+          width: 14px;
+          height: 14px;
+        }
+        .md-line__main {
+          min-width: 0;
+        }
+        .md-line__content {
+          min-height: 28px;
+          display: flex;
+          align-items: center;
+        }
+        .md-line__content > * {
+          width: 100%;
+        }
+        .md-line + .md-line {
+          margin-top: 2px;
+        }
+        .md-line__spacer {
+          min-height: 1.2em;
+        }
+        .md-line__composer,
+        .md-line__comments {
+          margin-top: 8px;
+        }
+        .md-comment-composer {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+          padding: 10px 12px;
+          border-radius: 10px;
+          border: 1px solid var(--vscode-panel-border);
+          background: var(--vscode-editorWidget-background);
+        }
+        .md-comment-composer input {
+          min-width: 0;
+          flex: 1 1 auto;
+          border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+          border-radius: 6px;
+          background: var(--vscode-input-background);
+          color: var(--vscode-input-foreground);
+          padding: 7px 10px;
+          font: inherit;
+        }
+        .md-comment-composer button,
+        .md-comment-composer .ghost {
+          border: 1px solid var(--vscode-panel-border);
+          border-radius: 6px;
+          padding: 7px 10px;
+          cursor: pointer;
+        }
+        .md-comment-composer button {
+          background: var(--vscode-button-background);
+          color: var(--vscode-button-foreground);
+        }
+        .md-comment-composer .ghost {
+          background: var(--vscode-button-secondaryBackground);
+          color: var(--vscode-button-secondaryForeground);
+        }
+        .md-comment-list {
+          display: grid;
+          gap: 6px;
+        }
+        .md-comment {
+          display: flex;
+          gap: 8px;
+          align-items: flex-start;
+          padding: 10px 12px;
+          border-radius: 10px;
+          border: 1px solid var(--vscode-panel-border);
+          background: color-mix(in srgb, var(--vscode-textLink-foreground) 8%, var(--vscode-editorWidget-background));
+        }
+        .md-comment__icon {
+          width: 16px;
+          height: 16px;
+          color: var(--vscode-textLink-foreground);
+          flex: 0 0 auto;
+          margin-top: 2px;
+        }
+        .md-comment__text {
+          line-height: 1.5;
+          word-break: break-word;
+        }
         @media (max-width: 820px) {
           .spec-split {
             grid-template-columns: 1fr;
@@ -752,10 +1167,7 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
               <span class="pill">${change.specs.length} specs</span>
             </div>
           </div>
-          <button type="button" class="action" data-action="open-file" data-uri="${escapeHtml(currentUri)}" ${currentUri ? '' : 'disabled'}>
-            ${renderIcon('file')}
-            <span>Open File</span>
-          </button>
+          ${renderHeaderActions(currentUri)}
         </section>
         <nav class="tabs">
           ${tabs.map((tab) => `
@@ -764,15 +1176,15 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
         </nav>
         <section class="panel ${change.selectedTab === 'proposal' ? 'active' : ''}" data-panel="proposal">
           <h2 class="source-section__title">${renderIcon('proposal')}${escapeHtml(change.proposal?.title ?? 'Proposal')}</h2>
-          ${change.proposal?.content ? renderMarkdown(change.proposal.content) : '<p class="empty">No proposal.md</p>'}
+          ${change.proposal?.content ? renderCommentableMarkdown(change.proposal.content) : '<p class="empty">No proposal.md</p>'}
         </section>
         <section class="panel ${change.selectedTab === 'design' ? 'active' : ''}" data-panel="design">
           <h2 class="source-section__title">${renderIcon('design')}${escapeHtml(change.design?.title ?? 'Design')}</h2>
-          ${change.design?.content ? renderMarkdown(change.design.content) : '<p class="empty">No design.md</p>'}
+          ${change.design?.content ? renderCommentableMarkdown(change.design.content) : '<p class="empty">No design.md</p>'}
         </section>
         <section class="panel ${change.selectedTab === 'tasks' ? 'active' : ''}" data-panel="tasks">
           <h2 class="source-section__title">${renderIcon('tasks')}Tasks</h2>
-          ${change.tasks?.content ? renderMarkdown(change.tasks.content) : '<p class="empty">No tasks.md</p>'}
+          ${change.tasks?.content ? renderCommentableMarkdown(change.tasks.content) : '<p class="empty">No tasks.md</p>'}
         </section>
         <section class="panel ${change.selectedTab === 'specs' ? 'active' : ''}" data-panel="specs">
           <h2 class="source-section__title">${renderIcon('specs')}Specs</h2>
@@ -786,17 +1198,124 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
         const specItems = [...document.querySelectorAll('[data-spec-target]')];
         const specPanels = [...document.querySelectorAll('[data-spec-panel]')];
         const openFileButton = document.querySelector('[data-action="open-file"]');
+        const copyCommentsButton = document.querySelector('[data-action="copy-comments"]');
+        const refreshButton = document.querySelector('[data-action="refresh-view"]');
         let currentUri = ${JSON.stringify(currentUri)};
+        let currentFileLabel = ${JSON.stringify(fileTargets[change.selectedTab].fileLabel)};
+        let currentOwnerLabel = ${JSON.stringify(fileTargets[change.selectedTab].ownerLabel)};
         const fileTargets = ${JSON.stringify(fileTargets)};
+        const comments = [];
+        let activeComposerKey = '';
+        const commentIcon = ${JSON.stringify(renderIcon('comment'))};
+        const getLineKey = (fileUri, line) => fileUri + '#' + line;
+        const getLineMeta = (lineElement) => ({
+          fileUri: lineElement.getAttribute('data-file-uri') || currentUri,
+          fileLabel: lineElement.getAttribute('data-file-label') || currentFileLabel,
+          ownerLabel: lineElement.getAttribute('data-owner-label') || currentOwnerLabel,
+          line: Number(lineElement.getAttribute('data-line') || '0'),
+        });
         const updateOpenFileState = (uri) => {
-          currentUri = uri || '';
+          currentUri = uri?.uri || '';
+          currentFileLabel = uri?.fileLabel || '';
+          currentOwnerLabel = uri?.ownerLabel || '';
           if (!openFileButton) {
             return;
           }
           openFileButton.disabled = !currentUri;
           openFileButton.setAttribute('data-uri', currentUri);
         };
-        updateOpenFileState(currentUri);
+        const renderCommentState = () => {
+          document.querySelectorAll('.md-line').forEach((lineElement) => {
+            const meta = getLineMeta(lineElement);
+            const key = getLineKey(meta.fileUri, meta.line);
+            lineElement.classList.toggle('md-line--active', activeComposerKey === key);
+            const composer = lineElement.querySelector('[data-comment-composer]');
+            const commentList = lineElement.querySelector('[data-comment-list]');
+            const lineComments = comments.filter((comment) => comment.fileUri === meta.fileUri && comment.line === meta.line);
+            if (commentList) {
+              commentList.innerHTML = lineComments.length === 0
+                ? ''
+                : '<div class="md-comment-list">' + lineComments.map(() => '<div class="md-comment">' + commentIcon + '<div class="md-comment__text"></div></div>').join('') + '</div>';
+              if (commentList.firstElementChild) {
+                [...commentList.querySelectorAll('.md-comment__text')].forEach((node, index) => {
+                  node.textContent = lineComments[index]?.text || '';
+                });
+              }
+            }
+            if (composer) {
+              if (activeComposerKey !== key) {
+                composer.innerHTML = '';
+              } else {
+                composer.innerHTML = '<form class="md-comment-composer"><input type="text" maxlength="500" placeholder="Add comment" /><button type="submit">Add</button><button type="button" class="ghost">Cancel</button></form>';
+                const form = composer.querySelector('form');
+                const input = composer.querySelector('input');
+                const cancelButton = composer.querySelector('.ghost');
+                if (input) {
+                  input.focus();
+                }
+                if (cancelButton) {
+                  cancelButton.addEventListener('click', () => {
+                    activeComposerKey = '';
+                    renderCommentState();
+                  });
+                }
+                if (form && input) {
+                  form.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                    const text = input.value.trim();
+                    if (!text) {
+                      return;
+                    }
+                    comments.push({ ...meta, text });
+                    activeComposerKey = '';
+                    renderCommentState();
+                  });
+                }
+              }
+            }
+          });
+        };
+        const refreshLineMetadata = () => {
+          document.querySelectorAll('[data-panel="proposal"] .md-line').forEach((line) => {
+            line.setAttribute('data-file-uri', fileTargets.proposal.uri);
+            line.setAttribute('data-file-label', fileTargets.proposal.fileLabel);
+            line.setAttribute('data-owner-label', fileTargets.proposal.ownerLabel);
+          });
+          document.querySelectorAll('[data-panel="design"] .md-line').forEach((line) => {
+            line.setAttribute('data-file-uri', fileTargets.design.uri);
+            line.setAttribute('data-file-label', fileTargets.design.fileLabel);
+            line.setAttribute('data-owner-label', fileTargets.design.ownerLabel);
+          });
+          document.querySelectorAll('[data-panel="tasks"] .md-line').forEach((line) => {
+            line.setAttribute('data-file-uri', fileTargets.tasks.uri);
+            line.setAttribute('data-file-label', fileTargets.tasks.fileLabel);
+            line.setAttribute('data-owner-label', fileTargets.tasks.ownerLabel);
+          });
+          specPanels.forEach((panel) => {
+            const uri = panel.getAttribute('data-spec-panel') || '';
+            const item = specItems.find((entry) => entry.getAttribute('data-spec-target') === uri);
+            const fileLabel = item?.getAttribute('data-file-label') || fileTargets.specs.fileLabel;
+            panel.querySelectorAll('.md-line').forEach((line) => {
+              line.setAttribute('data-file-uri', uri);
+              line.setAttribute('data-file-label', fileLabel);
+              line.setAttribute('data-owner-label', fileTargets.specs.ownerLabel);
+            });
+          });
+        };
+        document.querySelectorAll('[data-comment-trigger]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const lineElement = button.closest('.md-line');
+            if (!lineElement) {
+              return;
+            }
+            const meta = getLineMeta(lineElement);
+            const key = getLineKey(meta.fileUri, meta.line);
+            activeComposerKey = activeComposerKey === key ? '' : key;
+            renderCommentState();
+          });
+        });
+        updateOpenFileState(fileTargets[${JSON.stringify(change.selectedTab)}]);
+        refreshLineMetadata();
         if (openFileButton) {
           openFileButton.addEventListener('click', () => {
             if (currentUri) {
@@ -804,12 +1323,33 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
             }
           });
         }
+        if (copyCommentsButton) {
+          copyCommentsButton.addEventListener('click', async () => {
+            const text = comments.map((comment) => comment.ownerLabel + ' > ' + comment.fileLabel + ' [L' + comment.line + '] -> ' + JSON.stringify(comment.text)).join('\\n');
+            if (!text) {
+              return;
+            }
+            try {
+              await navigator.clipboard.writeText(text);
+              vscode.postMessage({ type: 'copiedComments' });
+            } catch {
+              vscode.postMessage({ type: 'copyCommentsText', text });
+            }
+          });
+        }
+        if (refreshButton) {
+          refreshButton.addEventListener('click', () => {
+            vscode.postMessage({ type: 'refreshView' });
+          });
+        }
         tabs.forEach((tab) => {
           tab.addEventListener('click', () => {
             const next = tab.getAttribute('data-tab');
             tabs.forEach((item) => item.classList.toggle('active', item === tab));
             panels.forEach((panel) => panel.classList.toggle('active', panel.getAttribute('data-panel') === next));
-            updateOpenFileState(next ? fileTargets[next] : '');
+            updateOpenFileState(next ? fileTargets[next] : null);
+            activeComposerKey = '';
+            renderCommentState();
           });
         });
         specItems.forEach((item) => {
@@ -823,9 +1363,17 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
             specPanels.forEach((panel) => {
               panel.classList.toggle('active', panel.getAttribute('data-spec-panel') === next);
             });
-            updateOpenFileState(next ?? '');
+            fileTargets.specs = {
+              uri: next ?? '',
+              fileLabel: item.getAttribute('data-file-label') || fileTargets.specs.fileLabel,
+              ownerLabel: fileTargets.specs.ownerLabel,
+            };
+            updateOpenFileState(fileTargets.specs);
+            activeComposerKey = '';
+            renderCommentState();
           });
         });
+        renderCommentState();
       </script>
     </body>
     </html>
@@ -845,25 +1393,44 @@ export class OpenspecSpecEditorProvider implements vscode.CustomReadonlyEditorPr
       localResourceRoots: [],
     };
 
-    webviewPanel.webview.onDidReceiveMessage((message: { type?: string; uri?: string }) => {
-      if (message.type !== 'openCurrentFile' || !message.uri) {
+    const render = async (): Promise<void> => {
+      if (isChangeFilePath(document.uri.fsPath)) {
+        const change = await readChangeDocument(document.uri);
+        const nonce = `${Date.now()}${Math.random().toString(16).slice(2)}`;
+        webviewPanel.webview.html = change
+          ? renderChangeEditor(change, webviewPanel.webview.cspSource, nonce)
+          : '<html><body><p>Not an Openspec change document.</p></body></html>';
         return;
       }
 
-      void vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(message.uri));
-    });
-
-    if (isChangeFilePath(document.uri.fsPath)) {
-      const change = await readChangeDocument(document.uri);
-      const nonce = `${Date.now()}${Math.random().toString(16).slice(2)}`;
-      webviewPanel.webview.html = change
-        ? renderChangeEditor(change, webviewPanel.webview.cspSource, nonce)
-        : '<html><body><p>Not an Openspec change document.</p></body></html>';
-    } else {
       const spec = await readSpecDocument(document.uri);
       webviewPanel.webview.html = spec
         ? renderSourceSpec(spec, webviewPanel.webview.cspSource, `${Date.now()}${Math.random().toString(16).slice(2)}`)
         : '<html><body><p>Not an Openspec document.</p></body></html>';
-    }
+    };
+
+    webviewPanel.webview.onDidReceiveMessage((message: { type?: string; uri?: string; text?: string }) => {
+      if (message.type === 'openCurrentFile' && message.uri) {
+        void vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(message.uri));
+        return;
+      }
+
+      if (message.type === 'copyCommentsText' && typeof message.text === 'string') {
+        void vscode.env.clipboard.writeText(message.text);
+        void vscode.window.setStatusBarMessage('Openspec comments copied', 2000);
+        return;
+      }
+
+      if (message.type === 'copiedComments') {
+        void vscode.window.setStatusBarMessage('Openspec comments copied', 2000);
+        return;
+      }
+
+      if (message.type === 'refreshView') {
+        void render();
+      }
+    });
+
+    await render();
   }
 }

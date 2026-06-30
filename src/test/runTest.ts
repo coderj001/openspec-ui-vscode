@@ -1,3 +1,4 @@
+import { formatCommentExport, getCommentFileLabel } from '../editors/comment-export';
 import * as assert from 'assert';
 import { renderMarkdown } from '../editors/markdown';
 import { resolveOpenFileUri } from '../editors/open-file-target';
@@ -51,6 +52,16 @@ async function main(): Promise<void> {
     assert.strictEqual(renderMarkdown('# Title\n\n- item\n\n`code` **bold**').includes('<h1 class="md-heading md-heading--1">Title</h1>'), true);
     assert.strictEqual(renderMarkdown('# Title\n\n- item\n\n`code` **bold**').includes('<code>code</code>'), true);
     assert.strictEqual(renderMarkdown('- [x] done').includes('md-list__marker--task'), true);
+    assert.strictEqual(getCommentFileLabel('/workspace/openspec/changes/add-views/design.md'), 'design.md');
+    assert.strictEqual(getCommentFileLabel('/workspace/openspec/changes/add-views/specs/catalog-management/spec.md'), 'catalog-management/spec.md');
+    assert.strictEqual(formatCommentExport([
+      {
+        ownerLabel: 'add-tag-people-suggestions',
+        fileLabel: 'design.md',
+        line: 12,
+        text: 'No longer need this scenario for now as it testing phase',
+      },
+    ]), 'add-tag-people-suggestions > design.md [L12] -> "No longer need this scenario for now as it testing phase"');
     assert.strictEqual(resolveOpenFileUri({
       selectedTab: 'design',
       proposal: undefined,
