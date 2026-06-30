@@ -80,10 +80,205 @@ function getEditorChrome(cspSource: string, nonce: string): string {
 
 function getMermaidBootScript(): string {
   return `
+        const escapeHtmlText = (value) => value.replace(/[&<>]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char] || char));
         const resolveMermaidApi = () => {
           const bundled = globalThis.__esbuild_esm_mermaid_nm?.mermaid;
           const direct = globalThis.mermaid;
           return bundled?.default || bundled || direct?.default || direct || null;
+        };
+        const getCssVar = (styles, name, fallback) => styles.getPropertyValue(name).trim() || fallback;
+        const getFontSize = (styles) => {
+          const value = Number.parseFloat(getCssVar(styles, '--vscode-editor-font-size', '14'));
+          return Number.isFinite(value) ? Math.max(12, Math.min(16, value)) : 14;
+        };
+        const isDarkColor = (color) => {
+          const match = color.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/i);
+          if (!match) {
+            return true;
+          }
+          const [, r, g, b] = match;
+          const luminance = (0.2126 * Number(r)) + (0.7152 * Number(g)) + (0.0722 * Number(b));
+          return luminance < 140;
+        };
+        const getMermaidConfig = () => {
+          const styles = getComputedStyle(document.body);
+          const background = getCssVar(styles, '--vscode-editorWidget-background', '#1f1f28');
+          const editorBackground = getCssVar(styles, '--vscode-editor-background', background);
+          const foreground = getCssVar(styles, '--vscode-editor-foreground', '#d4d4d4');
+          const border = getCssVar(styles, '--vscode-panel-border', '#3f3f46');
+          const accent = getCssVar(styles, '--vscode-textLink-foreground', '#4da3ff');
+          const note = getCssVar(styles, '--vscode-sideBar-background', editorBackground);
+          const error = getCssVar(styles, '--vscode-errorForeground', '#f48771');
+          const fontFamily = getCssVar(styles, '--vscode-editor-font-family', getCssVar(styles, '--vscode-font-family', 'sans-serif'));
+          const fontSize = getFontSize(styles);
+          const cardBackground = isDarkColor(background) ? '#f4f4f5' : '#ffffff';
+          const cardText = '#111111';
+          const labelBackground = isDarkColor(background) ? '#eef2a3' : '#f4f1a6';
+
+          return {
+            startOnLoad: false,
+            securityLevel: 'strict',
+            theme: 'base',
+            look: 'classic',
+            fontFamily,
+            fontSize,
+            themeVariables: {
+              background,
+              primaryColor: cardBackground,
+              primaryBorderColor: border,
+              primaryTextColor: cardText,
+              secondaryColor: cardBackground,
+              secondaryBorderColor: border,
+              secondaryTextColor: cardText,
+              tertiaryColor: note,
+              tertiaryBorderColor: border,
+              tertiaryTextColor: foreground,
+              lineColor: accent,
+              textColor: foreground,
+              mainBkg: background,
+              nodeBkg: cardBackground,
+              nodeBorder: border,
+              clusterBkg: note,
+              clusterBorder: border,
+              titleColor: foreground,
+              edgeLabelBackground: labelBackground,
+              labelTextColor: cardText,
+              actorBkg: cardBackground,
+              actorBorder: border,
+              actorTextColor: cardText,
+              actorLineColor: accent,
+              signalColor: accent,
+              signalTextColor: foreground,
+              labelBoxBkgColor: labelBackground,
+              labelBoxBorderColor: border,
+              labelTextColor: cardText,
+              loopTextColor: foreground,
+              noteBkgColor: note,
+              noteBorderColor: border,
+              noteTextColor: foreground,
+              activationBorderColor: border,
+              activationBkgColor: note,
+              sequenceNumberColor: foreground,
+              errorBkgColor: background,
+              errorTextColor: error,
+              pie1: accent,
+              pie2: border,
+              pie3: note,
+              pie4: background,
+            },
+            flowchart: {
+              useMaxWidth: true,
+              htmlLabels: false,
+            },
+            sequence: {
+              useMaxWidth: true,
+              wrap: true,
+            },
+          };
+        };
+        const applyMermaidSvgTheme = (preview) => {
+          const svg = preview.querySelector('svg');
+          if (!svg) {
+            return;
+          }
+
+          const styles = getComputedStyle(document.body);
+          const background = getCssVar(styles, '--vscode-editorWidget-background', '#1f1f28');
+          const editorBackground = getCssVar(styles, '--vscode-editor-background', background);
+          const foreground = getCssVar(styles, '--vscode-editor-foreground', '#d4d4d4');
+          const border = getCssVar(styles, '--vscode-panel-border', '#3f3f46');
+          const accent = getCssVar(styles, '--vscode-textLink-foreground', '#4da3ff');
+          const note = getCssVar(styles, '--vscode-sideBar-background', editorBackground);
+          const fontFamily = getCssVar(styles, '--vscode-editor-font-family', getCssVar(styles, '--vscode-font-family', 'sans-serif'));
+          const fontSize = getFontSize(styles);
+          const cardBackground = isDarkColor(background) ? '#f4f4f5' : '#ffffff';
+          const cardText = '#111111';
+          const labelBackground = isDarkColor(background) ? '#eef2a3' : '#f4f1a6';
+          const applyInline = (selector, styleMap) => {
+            svg.querySelectorAll(selector).forEach((node) => {
+              Object.entries(styleMap).forEach(([key, value]) => {
+                node.style.setProperty(key, value, 'important');
+              });
+            });
+          };
+          const viewBox = svg.getAttribute('viewBox');
+          if (!viewBox) {
+            const width = Number.parseFloat(svg.getAttribute('width') || '');
+            const height = Number.parseFloat(svg.getAttribute('height') || '');
+            if (Number.isFinite(width) && Number.isFinite(height)) {
+              svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+            }
+          }
+          svg.removeAttribute('height');
+          svg.removeAttribute('width');
+          svg.setAttribute('preserveAspectRatio', 'xMidYMin meet');
+          svg.style.width = '100%';
+          svg.style.maxWidth = '100%';
+          svg.style.height = 'auto';
+
+          const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+          style.textContent = \`
+            svg {
+              font-family: \${fontFamily} !important;
+              font-size: \${fontSize}px !important;
+            }
+            text, tspan, foreignObject, .edgeLabel, .messageText, .labelText, .loopText, .noteText {
+              fill: \${foreground} !important;
+              color: \${foreground} !important;
+            }
+            .labelBox, .label-container, .node rect, .node circle, .node ellipse, .node polygon, .node path {
+              fill: \${cardBackground} !important;
+              stroke: \${border} !important;
+            }
+            .nodeLabel, .nodeLabel *, .labelText, .labelText *, .actor + text, text.actor, .actor text {
+              fill: \${cardText} !important;
+              color: \${cardText} !important;
+              text-anchor: middle !important;
+              dominant-baseline: middle !important;
+            }
+            .cluster rect, .cluster polygon {
+              fill: \${note} !important;
+              stroke: \${border} !important;
+            }
+            rect.actor, .actor-line, .activation0, .activation1, .activation2, .activation3 {
+              fill: \${cardBackground} !important;
+              stroke: \${border} !important;
+            }
+            .messageLine0, .messageLine1, .loopLine, .noteLine, .sequenceNumber {
+              stroke: \${accent} !important;
+              fill: \${foreground} !important;
+            }
+            .edgePath path, .flowchart-link, .relationshipLine, .entityBox, .entityLabel {
+              stroke: \${accent} !important;
+            }
+            .labelBox, .label-container {
+              fill: \${labelBackground} !important;
+              stroke: \${border} !important;
+            }
+            .note, .note rect {
+              fill: \${note} !important;
+              stroke: \${border} !important;
+            }
+            .section, .section0, .section1, .section2, .section3 {
+              fill: \${editorBackground} !important;
+              stroke: \${border} !important;
+            }
+          \`;
+          svg.append(style);
+          applyInline('text.actor, .actor + text, .nodeLabel, .nodeLabel *, .labelText, .labelText *', {
+            fill: cardText,
+            color: cardText,
+            'text-anchor': 'middle',
+            'dominant-baseline': 'middle',
+          });
+          applyInline('rect.actor, .node rect, .node circle, .node ellipse, .node polygon, .node path', {
+            fill: cardBackground,
+            stroke: border,
+          });
+          applyInline('.labelBox, .label-container', {
+            fill: labelBackground,
+            stroke: border,
+          });
         };
 
         const renderMermaidDiagrams = async () => {
@@ -104,11 +299,7 @@ function getMermaidBootScript(): string {
             return;
           }
 
-          mermaidApi.initialize({
-            startOnLoad: false,
-            securityLevel: 'strict',
-            theme: document.body.classList.contains('vscode-dark') ? 'dark' : 'default',
-          });
+          mermaidApi.initialize(getMermaidConfig());
 
           for (const [index, diagram] of diagrams.entries()) {
             const sourceNode = diagram.querySelector('[data-mermaid-source]');
@@ -121,7 +312,8 @@ function getMermaidBootScript(): string {
 
             try {
               const result = await mermaidApi.render('openspec-mermaid-' + index + '-' + Date.now(), source);
-              preview.innerHTML = result.svg;
+              preview.innerHTML = '<div class="md-mermaid__canvas">' + result.svg + '</div>';
+              applyMermaidSvgTheme(preview);
               if (fallback) {
                 fallback.hidden = true;
               }
@@ -131,7 +323,7 @@ function getMermaidBootScript(): string {
                 : typeof error === 'string'
                   ? error
                   : 'Invalid mermaid diagram';
-              preview.innerHTML = '<div class="md-mermaid__error">Invalid mermaid diagram: ' + message.replace(/[&<>]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char] || char)) + '</div>';
+              preview.innerHTML = '<div class="md-mermaid__error">Invalid mermaid diagram: ' + escapeHtmlText(message) + '</div>';
               if (fallback) {
                 fallback.hidden = false;
               }
@@ -148,6 +340,67 @@ function renderSpecSections(spec: SpecDocument, includeEmpty: boolean): string {
     .join('');
 
   return sections || renderRawSpec(spec);
+}
+
+function getMermaidCss(): string {
+  return `
+        .md-mermaid {
+          display: grid;
+          gap: 6px;
+          width: 100%;
+        }
+        .md-mermaid__preview {
+          padding: 8px 10px;
+          border-radius: 8px;
+          border: 1px solid var(--vscode-panel-border);
+          background: var(--vscode-editorWidget-background);
+          overflow: hidden;
+        }
+        .md-mermaid__canvas {
+          display: flex;
+          justify-content: center;
+          align-items: flex-start;
+          width: 100%;
+        }
+        .md-mermaid__preview svg {
+          display: block;
+          width: min(100%, 880px);
+          max-width: 100%;
+          height: auto;
+          margin: 0 auto;
+        }
+        .md-mermaid__preview svg text,
+        .md-mermaid__preview svg tspan,
+        .md-mermaid__preview svg foreignObject {
+          fill: var(--vscode-editor-foreground);
+          color: var(--vscode-editor-foreground);
+        }
+        .md-mermaid__preview svg line,
+        .md-mermaid__preview svg path,
+        .md-mermaid__preview svg rect,
+        .md-mermaid__preview svg polygon,
+        .md-mermaid__preview svg circle,
+        .md-mermaid__preview svg ellipse {
+          vector-effect: non-scaling-stroke;
+        }
+        .md-mermaid__fallback[hidden] {
+          display: none;
+        }
+        .md-mermaid__source[hidden] {
+          display: none;
+        }
+        .md-mermaid__error {
+          color: var(--vscode-errorForeground);
+          font-weight: 600;
+          line-height: 1.5;
+        }
+        .md-line--diagram {
+          padding: 0;
+        }
+        .md-line--diagram .md-line__content {
+          min-height: 0;
+        }
+  `;
 }
 
 function renderSourceSpecBody(spec: SpecDocument): string {
@@ -197,13 +450,13 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string, 
         }
         body {
           margin: 0;
-          padding: 20px;
+          padding: 12px;
           background: var(--vscode-editor-background);
           color: var(--vscode-editor-foreground);
           font-family: var(--vscode-font-family);
         }
         .shell {
-          max-width: 980px;
+          max-width: 1200px;
           margin: 0 auto;
         }
         .hero {
@@ -211,7 +464,7 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string, 
           justify-content: space-between;
           gap: 12px;
           align-items: flex-start;
-          margin-bottom: 16px;
+          margin-bottom: 12px;
         }
         .actions {
           display: flex;
@@ -232,7 +485,7 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string, 
           gap: 8px;
         }
         .meta {
-          margin: 0 0 16px;
+          margin: 0 0 10px;
           color: var(--vscode-descriptionForeground);
         }
         .pill {
@@ -266,14 +519,14 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string, 
         .metrics {
           display: grid;
           grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 12px;
-          margin: 18px 0;
+          gap: 10px;
+          margin: 12px 0;
         }
         .metric, .source-section {
           background: var(--vscode-sideBar-background);
           border: 1px solid var(--vscode-panel-border);
           border-radius: 10px;
-          padding: 14px;
+          padding: 10px 12px;
         }
         .metric span {
           display: block;
@@ -284,10 +537,10 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string, 
           font-size: 1.1rem;
         }
         .source-section {
-          margin-top: 12px;
+          margin-top: 8px;
         }
         .source-section__title {
-          margin: 0 0 10px;
+          margin: 0 0 8px;
           font-size: 0.95rem;
           color: var(--vscode-textLink-foreground);
           display: flex;
@@ -547,33 +800,7 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string, 
           line-height: 1.5;
           word-break: break-word;
         }
-        .md-mermaid {
-          display: grid;
-          gap: 10px;
-          width: 100%;
-        }
-        .md-mermaid__preview {
-          padding: 12px;
-          border-radius: 10px;
-          border: 1px solid var(--vscode-panel-border);
-          background: var(--vscode-editorWidget-background);
-          overflow: auto;
-        }
-        .md-mermaid__preview svg {
-          display: block;
-          max-width: 100%;
-          height: auto;
-        }
-        .md-mermaid__fallback[hidden] {
-          display: none;
-        }
-        .md-mermaid__source[hidden] {
-          display: none;
-        }
-        .md-mermaid__error {
-          color: var(--vscode-errorForeground);
-          font-weight: 600;
-        }
+        ${getMermaidCss()}
       </style>
     </head>
     <body>
@@ -811,14 +1038,14 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
         .shell {
           max-width: 1100px;
           margin: 0 auto;
-          padding: 20px;
+          padding: 12px;
         }
         .hero {
           display: flex;
           justify-content: space-between;
           gap: 12px;
           align-items: flex-start;
-          margin-bottom: 18px;
+          margin-bottom: 12px;
         }
         .actions {
           display: flex;
@@ -834,7 +1061,7 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           gap: 8px;
         }
         .hero p {
-          margin: 0 0 10px;
+          margin: 0 0 8px;
           color: var(--vscode-descriptionForeground);
         }
         .meta-row {
@@ -873,7 +1100,7 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           display: flex;
           gap: 8px;
           flex-wrap: wrap;
-          margin-bottom: 16px;
+          margin-bottom: 12px;
         }
         .tab {
           border: 1px solid var(--vscode-panel-border);
@@ -895,18 +1122,18 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           border: 1px solid var(--vscode-panel-border);
           background: var(--vscode-sideBar-background);
           border-radius: 12px;
-          padding: 16px;
+          padding: 10px 12px;
           font-size: var(--vscode-editor-font-size);
         }
         .panel.active {
           display: block;
         }
         .panel h2 {
-          margin: 0 0 12px;
+          margin: 0 0 8px;
           font-size: 1rem;
         }
         .source-section__title {
-          margin: 0 0 12px;
+          margin: 0 0 8px;
           font-size: 0.95rem;
           display: flex;
           align-items: center;
@@ -1247,33 +1474,7 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           line-height: 1.5;
           word-break: break-word;
         }
-        .md-mermaid {
-          display: grid;
-          gap: 10px;
-          width: 100%;
-        }
-        .md-mermaid__preview {
-          padding: 12px;
-          border-radius: 10px;
-          border: 1px solid var(--vscode-panel-border);
-          background: var(--vscode-editorWidget-background);
-          overflow: auto;
-        }
-        .md-mermaid__preview svg {
-          display: block;
-          max-width: 100%;
-          height: auto;
-        }
-        .md-mermaid__fallback[hidden] {
-          display: none;
-        }
-        .md-mermaid__source[hidden] {
-          display: none;
-        }
-        .md-mermaid__error {
-          color: var(--vscode-errorForeground);
-          font-weight: 600;
-        }
+        ${getMermaidCss()}
         @media (max-width: 820px) {
           .spec-split {
             grid-template-columns: 1fr;
