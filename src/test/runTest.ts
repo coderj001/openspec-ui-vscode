@@ -22,6 +22,7 @@ async function main(): Promise<void> {
     );
 
     assert.strictEqual(parsed.title, 'Sample Spec');
+    assert.strictEqual(parsed.rawText.includes('Ship it.'), true);
     assert.strictEqual(parsed.sections.Proposal, 'Ship it.');
     assert.strictEqual(parsed.taskProgress.total, 2);
     assert.strictEqual(parsed.taskProgress.completed, 1);

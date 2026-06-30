@@ -30,6 +30,7 @@ export interface ChangeDocument {
   readonly status: 'active' | 'archive';
   readonly folderUri: vscode.Uri;
   readonly selectedTab: ChangeTabName;
+  readonly selectedSpecUri?: vscode.Uri;
   readonly proposal?: ChangeFileDocument;
   readonly design?: ChangeFileDocument;
   readonly tasks?: ChangeFileDocument;
@@ -227,7 +228,11 @@ export async function readChangeDocument(uri: vscode.Uri): Promise<ChangeDocumen
 
   const status = /(^|[\\/])(archive|archived)([\\/]|$)/i.test(rootPath) ? 'archive' : 'active';
   const title = proposal?.title ?? changeName;
+  const sortedSpecs = specs.sort((left, right) => left.uri.fsPath.localeCompare(right.uri.fsPath));
   const taskProgress = tasks ? countTaskProgress(tasks.content) : { completed: 0, total: 0 };
+  const selectedSpecUri = getSelectedTab(uri.fsPath) === 'specs'
+    ? sortedSpecs.find((spec) => spec.uri.fsPath === uri.fsPath)?.uri ?? sortedSpecs[0]?.uri
+    : undefined;
 
   return {
     kind: 'change',
@@ -236,10 +241,11 @@ export async function readChangeDocument(uri: vscode.Uri): Promise<ChangeDocumen
     status,
     folderUri,
     selectedTab: getSelectedTab(uri.fsPath),
+    selectedSpecUri,
     proposal,
     design,
     tasks,
-    specs: specs.sort((left, right) => left.uri.fsPath.localeCompare(right.uri.fsPath)),
+    specs: sortedSpecs,
     taskProgress,
   };
 }

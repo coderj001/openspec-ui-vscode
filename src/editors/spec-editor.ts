@@ -26,9 +26,51 @@ function renderSection(name: string, content: string): string {
   `;
 }
 
-function renderSourceSpec(spec: SpecDocument, cspSource: string): string {
+function renderRawSpec(spec: SpecDocument): string {
+  return `
+    <section class="source-section">
+      <h2>Markdown</h2>
+      <pre>${escapeHtml(spec.rawText || 'No content yet')}</pre>
+    </section>
+  `;
+}
+
+function renderSpecSections(spec: SpecDocument, includeEmpty: boolean): string {
+  const sections = specSectionNames
+    .filter((section) => includeEmpty || spec.sections[section])
+    .map((section) => renderSection(section, spec.sections[section]))
+    .join('');
+
+  return sections || renderRawSpec(spec);
+}
+
+function renderSourceSpecBody(spec: SpecDocument): string {
   const progress = spec.taskProgress.total === 0 ? 0 : Math.round((spec.taskProgress.completed / spec.taskProgress.total) * 100);
 
+  return `
+    <h1 class="title">${escapeHtml(spec.title)}</h1>
+    <p class="meta">${escapeHtml(spec.uri.fsPath)}</p>
+    <span class="pill">${escapeHtml(spec.status)} · ${progress}% tasks done</span>
+    <section class="metrics">
+      ${specSectionNames.map((section) => `
+        <div class="metric">
+          <span>${section}</span>
+          <strong>${spec.sections[section] ? 'Ready' : 'Empty'}</strong>
+        </div>
+      `).join('')}
+    </section>
+    ${renderSpecSections(spec, true)}
+  `;
+}
+
+function renderEmbeddedSpecBody(spec: SpecDocument): string {
+  return `
+    <h2>${escapeHtml(spec.title)}</h2>
+    ${renderSpecSections(spec, false)}
+  `;
+}
+
+function renderSourceSpec(spec: SpecDocument, cspSource: string): string {
   return /* html */ `
     <!doctype html>
     <html lang="en">
@@ -107,18 +149,7 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string): string {
     </head>
     <body>
       <main class="shell">
-        <h1 class="title">${escapeHtml(spec.title)}</h1>
-        <p class="meta">${escapeHtml(spec.uri.fsPath)}</p>
-        <span class="pill">${escapeHtml(spec.status)} · ${progress}% tasks done</span>
-        <section class="metrics">
-          ${specSectionNames.map((section) => `
-            <div class="metric">
-              <span>${section}</span>
-              <strong>${spec.sections[section] ? 'Ready' : 'Empty'}</strong>
-            </div>
-          `).join('')}
-        </section>
-        ${specSectionNames.map((section) => renderSection(section, spec.sections[section])).join('')}
+        ${renderSourceSpecBody(spec)}
       </main>
     </body>
     </html>
@@ -144,19 +175,47 @@ function renderChecklist(text: string): string {
   `;
 }
 
-function renderSpecLinks(specs: readonly SpecDocument[]): string {
-  if (specs.length === 0) {
+function renderSpecsPanel(change: ChangeDocument): string {
+  const selectedSpecUri = change.selectedSpecUri?.toString() ?? change.specs[0]?.uri.toString() ?? '';
+
+  if (change.specs.length === 0) {
     return '<p class="empty">No delta specs yet.</p>';
   }
 
   return `
-    <div class="spec-list">
-      ${specs.map((spec) => `
-        <button class="spec-link" data-uri="${escapeHtml(spec.uri.toString())}">
-          <strong>${escapeHtml(spec.title)}</strong>
-          <span>${escapeHtml(spec.uri.fsPath)}</span>
-        </button>
-      `).join('')}
+    <div class="spec-split">
+      <aside class="spec-nav" role="tablist" aria-label="Spec files">
+        ${change.specs.map((spec) => {
+          const selected = spec.uri.toString() === selectedSpecUri;
+
+          return `
+            <button
+              class="spec-nav__item ${selected ? 'active' : ''}"
+              data-spec-target="${escapeHtml(spec.uri.toString())}"
+              role="tab"
+              aria-selected="${selected ? 'true' : 'false'}"
+            >
+              <strong>${escapeHtml(spec.title)}</strong>
+              <span>${escapeHtml(spec.uri.fsPath.replace(`${change.folderUri.fsPath}/`, ''))}</span>
+            </button>
+          `;
+        }).join('')}
+      </aside>
+      <div class="spec-detail">
+        ${change.specs.map((spec) => {
+          const selected = spec.uri.toString() === selectedSpecUri;
+
+          return `
+            <section
+              class="spec-detail__panel ${selected ? 'active' : ''}"
+              data-spec-panel="${escapeHtml(spec.uri.toString())}"
+              role="tabpanel"
+            >
+              ${renderEmbeddedSpecBody(spec)}
+            </section>
+          `;
+        }).join('')}
+      </div>
     </div>
   `;
 }
@@ -301,24 +360,53 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           font-size: 0.85rem;
           flex: 0 0 18px;
         }
-        .spec-list {
+        .spec-split {
           display: grid;
-          gap: 10px;
+          grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+          gap: 14px;
         }
-        .spec-link {
+        .spec-nav {
+          display: grid;
+          gap: 8px;
+          align-content: start;
+        }
+        .spec-nav__item {
           text-align: left;
           border: 1px solid var(--vscode-panel-border);
           background: var(--vscode-editor-background);
           color: inherit;
           border-radius: 10px;
-          padding: 12px;
+          padding: 10px;
           cursor: pointer;
         }
-        .spec-link span {
+        .spec-nav__item.active {
+          border-color: var(--vscode-focusBorder);
+          background: var(--vscode-list-activeSelectionBackground);
+          color: var(--vscode-list-activeSelectionForeground);
+        }
+        .spec-nav__item span {
           display: block;
           margin-top: 4px;
           color: var(--vscode-descriptionForeground);
           word-break: break-all;
+        }
+        .spec-nav__item.active span {
+          color: inherit;
+          opacity: 0.85;
+        }
+        .spec-detail {
+          min-width: 0;
+        }
+        .spec-detail__panel {
+          display: none;
+        }
+        .spec-detail__panel.active {
+          display: block;
+        }
+        @media (max-width: 820px) {
+          .spec-split {
+            grid-template-columns: 1fr;
+          }
         }
       </style>
     </head>
@@ -356,13 +444,14 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
         </section>
         <section class="panel ${change.selectedTab === 'specs' ? 'active' : ''}" data-panel="specs">
           <h2>Specs</h2>
-          ${renderSpecLinks(change.specs)}
+          ${renderSpecsPanel(change)}
         </section>
       </main>
       <script nonce="${nonce}">
-        const vscode = acquireVsCodeApi();
         const tabs = [...document.querySelectorAll('.tab')];
         const panels = [...document.querySelectorAll('.panel')];
+        const specItems = [...document.querySelectorAll('[data-spec-target]')];
+        const specPanels = [...document.querySelectorAll('[data-spec-panel]')];
         tabs.forEach((tab) => {
           tab.addEventListener('click', () => {
             const next = tab.getAttribute('data-tab');
@@ -370,9 +459,17 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
             panels.forEach((panel) => panel.classList.toggle('active', panel.getAttribute('data-panel') === next));
           });
         });
-        document.querySelectorAll('[data-uri]').forEach((element) => {
-          element.addEventListener('click', () => {
-            vscode.postMessage({ type: 'openSpec', uri: element.getAttribute('data-uri') });
+        specItems.forEach((item) => {
+          item.addEventListener('click', () => {
+            const next = item.getAttribute('data-spec-target');
+            specItems.forEach((entry) => {
+              const active = entry === item;
+              entry.classList.toggle('active', active);
+              entry.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            specPanels.forEach((panel) => {
+              panel.classList.toggle('active', panel.getAttribute('data-spec-panel') === next);
+            });
           });
         });
       </script>
@@ -397,11 +494,6 @@ export class OpenspecSpecEditorProvider implements vscode.CustomReadonlyEditorPr
     if (isChangeFilePath(document.uri.fsPath)) {
       const change = await readChangeDocument(document.uri);
       const nonce = `${Date.now()}${Math.random().toString(16).slice(2)}`;
-      webviewPanel.webview.onDidReceiveMessage((message: { type?: string; uri?: string }) => {
-        if (message.type === 'openSpec' && message.uri) {
-          void vscode.commands.executeCommand('openspec.openSpec', vscode.Uri.parse(message.uri));
-        }
-      });
       webviewPanel.webview.html = change
         ? renderChangeEditor(change, webviewPanel.webview.cspSource, nonce)
         : '<html><body><p>Not an Openspec change document.</p></body></html>';

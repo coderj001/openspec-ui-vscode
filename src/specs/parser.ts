@@ -13,6 +13,7 @@ export interface SpecTaskProgress {
 export interface ParsedSpec {
   readonly title: string;
   readonly status: SpecStatus;
+  readonly rawText: string;
   readonly sections: Record<SpecSectionName, string>;
   readonly taskProgress: SpecTaskProgress;
 }
@@ -97,6 +98,7 @@ export function parseSpecText(filePath: string, text: string): ParsedSpec {
   return {
     title,
     status: isArchivePath(filePath) ? 'archive' : 'active',
+    rawText: text.trim(),
     sections,
     taskProgress,
   };
