@@ -20,19 +20,35 @@ export function isChangeSpecPath(filePath: string): boolean {
   return /(^|[\\/])openspec[\\/]changes[\\/].+[\\/]specs[\\/].+[\\/]spec\.md$/i.test(filePath);
 }
 
+function getChangeFolderIndex(segments: readonly string[]): number {
+  const changesIndex = segments.lastIndexOf('changes');
+
+  if (changesIndex === -1) {
+    return -1;
+  }
+
+  const bucket = segments[changesIndex + 1]?.toLowerCase();
+
+  if (bucket === 'archive' || bucket === 'archived') {
+    return changesIndex + 2;
+  }
+
+  return changesIndex + 1;
+}
+
 export function getChangeFolderName(filePath: string): string | null {
   if (!isChangeFilePath(filePath)) {
     return null;
   }
 
   const segments = normalize(filePath).split('/');
-  const changesIndex = segments.lastIndexOf('changes');
+  const folderIndex = getChangeFolderIndex(segments);
 
-  if (changesIndex === -1 || changesIndex + 1 >= segments.length) {
+  if (folderIndex === -1 || folderIndex >= segments.length) {
     return null;
   }
 
-  return segments[changesIndex + 1] ?? null;
+  return segments[folderIndex] ?? null;
 }
 
 export function getChangeRootPath(filePath: string): string | null {
@@ -41,13 +57,13 @@ export function getChangeRootPath(filePath: string): string | null {
   }
 
   const segments = normalize(filePath).split('/');
-  const changesIndex = segments.lastIndexOf('changes');
+  const folderIndex = getChangeFolderIndex(segments);
 
-  if (changesIndex === -1 || changesIndex + 1 >= segments.length) {
+  if (folderIndex === -1 || folderIndex >= segments.length) {
     return null;
   }
 
-  return segments.slice(0, changesIndex + 2).join(path.sep);
+  return segments.slice(0, folderIndex + 1).join(path.sep);
 }
 
 export function getSpecFolderName(filePath: string): string | null {
@@ -59,4 +75,8 @@ export function getSpecFolderName(filePath: string): string | null {
   }
 
   return segments[specsIndex + 1] ?? null;
+}
+
+export function formatArchiveName(name: string): string {
+  return name.replace(/^\d{4}-\d{2}-\d{2}-/, '');
 }

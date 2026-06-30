@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import { parseSpecText, looksLikeSpec } from '../specs/parser';
-import { getChangeFolderName, getSpecFolderName, isChangeFilePath, isChangeSpecPath, isSourceSpecPath } from '../specs/paths';
+import { formatArchiveName, getChangeFolderName, getChangeRootPath, getSpecFolderName, isChangeFilePath, isChangeSpecPath, isSourceSpecPath } from '../specs/paths';
 
 async function main(): Promise<void> {
   try {
@@ -39,7 +39,12 @@ async function main(): Promise<void> {
     assert.strictEqual(isChangeFilePath('/workspace/openspec/changes/add-views/proposal.md'), true);
     assert.strictEqual(isChangeSpecPath('/workspace/openspec/changes/add-views/specs/core/spec.md'), true);
     assert.strictEqual(getChangeFolderName('/workspace/openspec/changes/add-views/specs/core/spec.md'), 'add-views');
+    assert.strictEqual(getChangeRootPath('/workspace/openspec/changes/add-views/specs/core/spec.md'), '/workspace/openspec/changes/add-views');
+    assert.strictEqual(getChangeFolderName('/workspace/openspec/changes/archive/2026-06-09-browser-graph-bearer-auth/specs/core/spec.md'), '2026-06-09-browser-graph-bearer-auth');
+    assert.strictEqual(getChangeRootPath('/workspace/openspec/changes/archive/2026-06-09-browser-graph-bearer-auth/specs/core/spec.md'), '/workspace/openspec/changes/archive/2026-06-09-browser-graph-bearer-auth');
     assert.strictEqual(getSpecFolderName('/workspace/openspec/changes/add-views/specs/catalog-management/spec.md'), 'catalog-management');
+    assert.strictEqual(formatArchiveName('2026-06-09-browser-graph-bearer-auth'), 'browser-graph-bearer-auth');
+    assert.strictEqual(formatArchiveName('browser-graph-bearer-auth'), 'browser-graph-bearer-auth');
     assert.strictEqual(parseSpecText('/workspace/openspec/changes/archive/add-views/specs/core/spec.md', '# Archived').status, 'archive');
 
     console.log('test: ok');

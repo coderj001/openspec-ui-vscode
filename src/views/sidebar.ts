@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { ChangeSummary, listChangeSummaries } from '../specs/service';
+import { formatArchiveName } from '../specs/paths';
 
 function escapeHtml(value: string): string {
   return value
@@ -22,51 +23,46 @@ function renderPill(label: string, tone: string, enabled: boolean): string {
   return `<span class="pill pill--${tone} ${enabled ? '' : 'pill--muted'}">${escapeHtml(label)}</span>`;
 }
 
-function renderRow(change: ChangeSummary): string {
+function renderCard(change: ChangeSummary, archived: boolean): string {
   const hasProposal = Boolean(change.proposalUri);
   const hasDesign = Boolean(change.designUri);
   const hasTasks = Boolean(change.tasksUri);
   const hasSpecs = change.deltaSpecCount > 0;
+  const progress = progressPercent(change);
+  const name = archived ? formatArchiveName(change.name) : change.name;
+  const status = archived ? 'archive' : 'active';
+
+  const body = `
+    <div class="card__top">
+      <strong>${escapeHtml(name)}</strong>
+      <span class="status">${escapeHtml(status)}</span>
+    </div>
+    <div class="pills">
+      ${renderPill('Proposal', 'proposal', hasProposal)}
+      ${renderPill('Design', 'design', hasDesign)}
+      ${renderPill('Tasks', 'tasks', hasTasks)}
+      ${renderPill('Specs', 'specs', hasSpecs)}
+    </div>
+    <div class="progress-meta">
+      <span>${change.taskProgress.completed}/${change.taskProgress.total} tasks</span>
+      <span>${progress}%</span>
+    </div>
+    <div class="progress" aria-hidden="true">
+      <div class="progress__bar" style="width:${progress}%"></div>
+    </div>
+  `;
 
   if (!change.openUri) {
     return `
-      <div class="row row--muted">
-        <span>${escapeHtml(change.name)}</span>
-        <span>${escapeHtml(change.status)}</span>
+      <div class="card card--muted">
+        ${body}
       </div>
     `;
   }
-
-  if (change.status === 'archive') {
-    return `
-      <button class="row row--archive" data-uri="${escapeHtml(change.openUri.toString())}">
-        <span>${escapeHtml(change.name)}</span>
-        <span>${escapeHtml(change.status)}</span>
-      </button>
-    `;
-  }
-
-  const progress = progressPercent(change);
 
   return `
-    <button class="card" data-uri="${escapeHtml(change.openUri.toString())}">
-      <div class="card__top">
-        <strong>${escapeHtml(change.name)}</strong>
-        <span class="status">active</span>
-      </div>
-      <div class="pills">
-        ${renderPill('Proposal', 'proposal', hasProposal)}
-        ${renderPill('Design', 'design', hasDesign)}
-        ${renderPill('Tasks', 'tasks', hasTasks)}
-        ${renderPill('Specs', 'specs', hasSpecs)}
-      </div>
-      <div class="progress-meta">
-        <span>${change.taskProgress.completed}/${change.taskProgress.total} tasks</span>
-        <span>${progress}%</span>
-      </div>
-      <div class="progress" aria-hidden="true">
-        <div class="progress__bar" style="width:${progress}%"></div>
-      </div>
+    <button class="card ${archived ? 'card--archive' : ''}" data-uri="${escapeHtml(change.openUri.toString())}">
+      ${body}
     </button>
   `;
 }
@@ -79,8 +75,26 @@ function renderSection(title: string, items: readonly ChangeSummary[]): string {
   return `
     <section class="section">
       <div class="section__title">${escapeHtml(title)}</div>
-      ${items.map(renderRow).join('')}
+      ${items.map((item) => renderCard(item, false)).join('')}
     </section>
+  `;
+}
+
+function renderArchiveSection(items: readonly ChangeSummary[]): string {
+  if (items.length === 0) {
+    return '';
+  }
+
+  return `
+    <details class="archive">
+      <summary class="archive__summary">
+        <span>Archive</span>
+        <span class="archive__count">${items.length}</span>
+      </summary>
+      <div class="section">
+        ${items.map((item) => renderCard(item, true)).join('')}
+      </div>
+    </details>
   `;
 }
 
@@ -145,12 +159,6 @@ function renderHtml(changes: ChangeSummary[], cspSource: string, nonce: string):
           letter-spacing: 0.08em;
           padding: 2px 2px 0;
         }
-        .row {
-          display: flex;
-          justify-content: space-between;
-          gap: 8px;
-          align-items: center;
-        }
         .card {
           width: 100%;
           text-align: left;
@@ -162,8 +170,15 @@ function renderHtml(changes: ChangeSummary[], cspSource: string, nonce: string):
           cursor: pointer;
         }
         .card:hover,
-        .row:hover {
+        .card:focus-visible {
           border-color: var(--vscode-focusBorder);
+        }
+        .card--archive {
+          background: color-mix(in srgb, var(--vscode-sideBar-background) 82%, var(--vscode-editor-background));
+        }
+        .card--muted {
+          opacity: 0.72;
+          cursor: default;
         }
         .card__top,
         .progress-meta {
@@ -243,12 +258,31 @@ function renderHtml(changes: ChangeSummary[], cspSource: string, nonce: string):
             var(--vscode-testing-iconPassed)
           );
         }
-        .row--archive {
-          background: color-mix(in srgb, var(--vscode-sideBar-background) 94%, transparent);
+        .archive {
+          margin-top: 12px;
         }
-        .row--muted {
-          opacity: 0.7;
-          cursor: default;
+        .archive__summary {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          list-style: none;
+          color: var(--vscode-sideBar-foreground);
+          background: var(--vscode-sideBar-background);
+          border: 1px solid var(--vscode-panel-border);
+          border-radius: 10px;
+          padding: 9px 10px;
+        }
+        .archive__summary::-webkit-details-marker {
+          display: none;
+        }
+        .archive__count {
+          color: var(--vscode-badge-foreground);
+          background: var(--vscode-badge-background);
+          border-radius: 999px;
+          padding: 2px 8px;
+          font-size: 0.75rem;
         }
         .empty {
           color: var(--vscode-descriptionForeground);
@@ -265,7 +299,7 @@ function renderHtml(changes: ChangeSummary[], cspSource: string, nonce: string):
       </div>
       ${changes.length === 0 ? '<div class="empty">No openspec changes under openspec/changes.</div>' : ''}
       ${renderSection('Active', active)}
-      ${renderSection('Archive', archived)}
+      ${renderArchiveSection(archived)}
       <script nonce="${nonce}">
         const vscode = acquireVsCodeApi();
         document.querySelector('[data-action="refresh"]').addEventListener('click', () => {
