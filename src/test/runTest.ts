@@ -1,4 +1,5 @@
 import * as assert from 'assert';
+import { renderMarkdown } from '../editors/markdown';
 import { parseSpecText, looksLikeSpec } from '../specs/parser';
 import { formatArchiveName, getChangeFolderName, getChangeRootPath, getSpecFolderName, isChangeFilePath, isChangeSpecPath, isSourceSpecPath } from '../specs/paths';
 
@@ -46,6 +47,8 @@ async function main(): Promise<void> {
     assert.strictEqual(formatArchiveName('2026-06-09-browser-graph-bearer-auth'), 'browser-graph-bearer-auth');
     assert.strictEqual(formatArchiveName('browser-graph-bearer-auth'), 'browser-graph-bearer-auth');
     assert.strictEqual(parseSpecText('/workspace/openspec/changes/archive/add-views/specs/core/spec.md', '# Archived').status, 'archive');
+    assert.strictEqual(renderMarkdown('# Title\n\n- item\n\n`code` **bold**').includes('<h1 class="md-heading md-heading--1">Title</h1>'), true);
+    assert.strictEqual(renderMarkdown('# Title\n\n- item\n\n`code` **bold**').includes('<code>code</code>'), true);
 
     console.log('test: ok');
   } catch (error) {

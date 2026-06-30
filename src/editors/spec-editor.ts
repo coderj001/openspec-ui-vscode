@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { renderMarkdown } from './markdown';
 import { specSectionNames } from '../specs/parser';
 import { ChangeDocument, readChangeDocument, readSpecDocument, SpecDocument } from '../specs/service';
 import { getSpecFolderName, isChangeFilePath } from '../specs/paths';
@@ -17,11 +18,23 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+function renderIcon(name: string): string {
+  const paths: Record<string, string> = {
+    proposal: 'M7 3h8l4 4v14H7z M15 3v4h4',
+    design: 'M4 17l6-6 4 4 6-10 2 2-8 13-4-4-6 6z',
+    tasks: 'M5 6h14M5 12h14M5 18h10',
+    specs: 'M6 4h12v16H6z M9 8h6M9 12h6M9 16h4',
+    markdown: 'M5 6h14M5 10h8M5 14h12M5 18h8',
+  };
+
+  return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[name] ?? paths.markdown}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
 function renderSection(name: string, content: string): string {
   return `
     <section class="source-section">
-      <h2>${escapeHtml(name)}</h2>
-      <pre>${escapeHtml(content || 'No content yet')}</pre>
+      <h2 class="source-section__title">${renderIcon('markdown')}${escapeHtml(name)}</h2>
+      ${content ? renderMarkdown(content) : '<p class="empty">No content yet</p>'}
     </section>
   `;
 }
@@ -29,8 +42,8 @@ function renderSection(name: string, content: string): string {
 function renderRawSpec(spec: SpecDocument): string {
   return `
     <section class="source-section">
-      <h2>Markdown</h2>
-      <pre>${escapeHtml(spec.rawText || 'No content yet')}</pre>
+      <h2 class="source-section__title">${renderIcon('markdown')}Markdown</h2>
+      ${spec.rawText ? renderMarkdown(spec.rawText) : '<p class="empty">No content yet</p>'}
     </section>
   `;
 }
@@ -48,7 +61,7 @@ function renderSourceSpecBody(spec: SpecDocument): string {
   const progress = spec.taskProgress.total === 0 ? 0 : Math.round((spec.taskProgress.completed / spec.taskProgress.total) * 100);
 
   return `
-    <h1 class="title">${escapeHtml(spec.title)}</h1>
+    <h1 class="title">${renderIcon('markdown')}${escapeHtml(spec.title)}</h1>
     <p class="meta">${escapeHtml(spec.uri.fsPath)}</p>
     <span class="pill">${escapeHtml(spec.status)} · ${progress}% tasks done</span>
     <section class="metrics">
@@ -65,7 +78,7 @@ function renderSourceSpecBody(spec: SpecDocument): string {
 
 function renderEmbeddedSpecBody(spec: SpecDocument): string {
   return `
-    <h2>${escapeHtml(spec.title)}</h2>
+    <h2 class="source-section__title">${renderIcon('specs')}${escapeHtml(spec.title)}</h2>
     ${renderSpecSections(spec, false)}
   `;
 }
@@ -95,7 +108,10 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string): string {
         }
         .title {
           margin: 0 0 4px;
-          font-size: 1.75rem;
+          font-size: 1.35rem;
+          display: flex;
+          align-items: center;
+          gap: 8px;
         }
         .meta {
           margin: 0 0 16px;
@@ -132,10 +148,79 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string): string {
         .source-section {
           margin-top: 12px;
         }
-        .source-section h2 {
+        .source-section__title {
           margin: 0 0 10px;
-          font-size: 1rem;
+          font-size: 0.95rem;
           color: var(--vscode-textLink-foreground);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .icon {
+          width: 16px;
+          height: 16px;
+          flex: 0 0 auto;
+          color: var(--vscode-descriptionForeground);
+        }
+        .md-heading {
+          margin: 1.1em 0 0.45em;
+          line-height: 1.2;
+        }
+        .md-heading--1 {
+          font-size: 1.4rem;
+        }
+        .md-heading--2 {
+          font-size: 1.15rem;
+        }
+        .md-heading--3,
+        .md-heading--4,
+        .md-heading--5,
+        .md-heading--6 {
+          font-size: 1rem;
+        }
+        .md-heading--scenario {
+          color: var(--vscode-textLink-foreground);
+        }
+        .md-list {
+          margin: 0.6em 0 0;
+          padding-left: 1.4em;
+        }
+        .md-quote {
+          margin: 0.75em 0 0;
+          padding: 0.1em 0 0.1em 1em;
+          border-left: 3px solid var(--vscode-panel-border);
+          color: var(--vscode-descriptionForeground);
+        }
+        .md-code {
+          margin: 0.75em 0 0;
+          padding: 12px 14px;
+          border-radius: 10px;
+          overflow-x: auto;
+          background: var(--vscode-editorWidget-background);
+          border: 1px solid var(--vscode-panel-border);
+        }
+        .md-code code {
+          font-family: var(--vscode-editor-font-family);
+          font-size: var(--vscode-editor-font-size);
+        }
+        p {
+          margin: 0.75em 0 0;
+          line-height: 1.6;
+        }
+        a {
+          color: var(--vscode-textLink-foreground);
+        }
+        strong {
+          font-weight: 600;
+        }
+        em {
+          font-style: italic;
+        }
+        code:not(.md-code code) {
+          padding: 0.08em 0.35em;
+          border-radius: 6px;
+          background: var(--vscode-editorWidget-background);
+          border: 1px solid var(--vscode-panel-border);
         }
         pre {
           margin: 0;
@@ -267,7 +352,10 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
         }
         .hero h1 {
           margin: 0 0 4px;
-          font-size: 1.8rem;
+          font-size: 1.3rem;
+          display: flex;
+          align-items: center;
+          gap: 8px;
         }
         .hero p {
           margin: 0 0 10px;
@@ -298,6 +386,9 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           border-radius: 8px;
           padding: 8px 12px;
           cursor: pointer;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
         }
         .tab.active {
           border-color: var(--vscode-focusBorder);
@@ -316,6 +407,80 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
         .panel h2 {
           margin: 0 0 12px;
           font-size: 1rem;
+        }
+        .source-section__title {
+          margin: 0 0 12px;
+          font-size: 0.95rem;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          color: var(--vscode-textLink-foreground);
+        }
+        .icon {
+          width: 16px;
+          height: 16px;
+          flex: 0 0 auto;
+          color: var(--vscode-descriptionForeground);
+        }
+        .md-heading {
+          margin: 1.1em 0 0.45em;
+          line-height: 1.2;
+        }
+        .md-heading--1 {
+          font-size: 1.4rem;
+        }
+        .md-heading--2 {
+          font-size: 1.15rem;
+        }
+        .md-heading--3,
+        .md-heading--4,
+        .md-heading--5,
+        .md-heading--6 {
+          font-size: 1rem;
+        }
+        .md-heading--scenario {
+          color: var(--vscode-textLink-foreground);
+        }
+        .md-list {
+          margin: 0.6em 0 0;
+          padding-left: 1.4em;
+        }
+        .md-quote {
+          margin: 0.75em 0 0;
+          padding: 0.1em 0 0.1em 1em;
+          border-left: 3px solid var(--vscode-panel-border);
+          color: var(--vscode-descriptionForeground);
+        }
+        .md-code {
+          margin: 0.75em 0 0;
+          padding: 12px 14px;
+          border-radius: 10px;
+          overflow-x: auto;
+          background: var(--vscode-editorWidget-background);
+          border: 1px solid var(--vscode-panel-border);
+        }
+        .md-code code {
+          font-family: var(--vscode-editor-font-family);
+          font-size: var(--vscode-editor-font-size);
+        }
+        p {
+          margin: 0.75em 0 0;
+          line-height: 1.6;
+        }
+        a {
+          color: var(--vscode-textLink-foreground);
+        }
+        strong {
+          font-weight: 600;
+        }
+        em {
+          font-style: italic;
+        }
+        code:not(.md-code code) {
+          padding: 0.08em 0.35em;
+          border-radius: 6px;
+          background: var(--vscode-editorWidget-background);
+          border: 1px solid var(--vscode-panel-border);
         }
         .panel pre {
           margin: 0;
@@ -456,7 +621,7 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
     <body>
       <main class="shell">
         <section class="hero">
-          <h1>${escapeHtml(change.name)}</h1>
+          <h1>${renderIcon('markdown')}${escapeHtml(change.name)}</h1>
           <p>${escapeHtml(change.folderUri.fsPath)}</p>
           <div class="meta-row">
             <span class="pill">${escapeHtml(change.status)}</span>
@@ -466,27 +631,27 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
         </section>
         <nav class="tabs">
           ${tabs.map((tab) => `
-            <button class="tab ${change.selectedTab === tab.id ? 'active' : ''}" data-tab="${tab.id}">${tab.label}</button>
+            <button class="tab ${change.selectedTab === tab.id ? 'active' : ''}" data-tab="${tab.id}">${renderIcon(tab.id)}${tab.label}</button>
           `).join('')}
         </nav>
         <section class="panel ${change.selectedTab === 'proposal' ? 'active' : ''}" data-panel="proposal">
-          <h2>${escapeHtml(change.proposal?.title ?? 'Proposal')}</h2>
-          <pre>${escapeHtml(change.proposal?.content || 'No proposal.md')}</pre>
+          <h2 class="source-section__title">${renderIcon('proposal')}${escapeHtml(change.proposal?.title ?? 'Proposal')}</h2>
+          ${change.proposal?.content ? renderMarkdown(change.proposal.content) : '<p class="empty">No proposal.md</p>'}
         </section>
         <section class="panel ${change.selectedTab === 'design' ? 'active' : ''}" data-panel="design">
-          <h2>${escapeHtml(change.design?.title ?? 'Design')}</h2>
+          <h2 class="source-section__title">${renderIcon('design')}${escapeHtml(change.design?.title ?? 'Design')}</h2>
           <div class="design-grid">
             <div class="design-block">
-              <pre>${escapeHtml(change.design?.content || 'No design.md')}</pre>
+              ${change.design?.content ? renderMarkdown(change.design.content) : '<p class="empty">No design.md</p>'}
             </div>
           </div>
         </section>
         <section class="panel ${change.selectedTab === 'tasks' ? 'active' : ''}" data-panel="tasks">
-          <h2>Tasks</h2>
+          <h2 class="source-section__title">${renderIcon('tasks')}Tasks</h2>
           ${renderChecklist(change.tasks?.content || '')}
         </section>
         <section class="panel ${change.selectedTab === 'specs' ? 'active' : ''}" data-panel="specs">
-          <h2>Specs</h2>
+          <h2 class="source-section__title">${renderIcon('specs')}Specs</h2>
           ${renderSpecsPanel(change)}
         </section>
       </main>
