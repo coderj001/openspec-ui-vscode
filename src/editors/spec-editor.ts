@@ -42,7 +42,6 @@ function renderSection(name: string, content: string): string {
 function renderRawSpec(spec: SpecDocument): string {
   return `
     <section class="source-section">
-      <h2 class="source-section__title">${renderIcon('markdown')}Markdown</h2>
       ${spec.rawText ? renderMarkdown(spec.rawText) : '<p class="empty">No content yet</p>'}
     </section>
   `;
@@ -77,10 +76,7 @@ function renderSourceSpecBody(spec: SpecDocument): string {
 }
 
 function renderEmbeddedSpecBody(spec: SpecDocument): string {
-  return `
-    <h2 class="source-section__title">${renderIcon('specs')}${escapeHtml(spec.title)}</h2>
-    ${renderSpecSections(spec, false)}
-  `;
+  return renderSpecSections(spec, false);
 }
 
 function renderSourceSpec(spec: SpecDocument, cspSource: string): string {
@@ -105,6 +101,11 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string): string {
         .shell {
           max-width: 980px;
           margin: 0 auto;
+        }
+        .shell,
+        .source-section,
+        .panel {
+          font-size: var(--vscode-editor-font-size);
         }
         .title {
           margin: 0 0 4px;
@@ -183,7 +184,55 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string): string {
         }
         .md-list {
           margin: 0.6em 0 0;
-          padding-left: 1.4em;
+          padding: 0;
+          list-style: none;
+        }
+        .md-list__item {
+          display: flex;
+          gap: 10px;
+          align-items: flex-start;
+          margin: 0 0 0.7em;
+          transition: transform 120ms ease, color 120ms ease;
+        }
+        .md-list__item:hover {
+          transform: translateX(2px);
+        }
+        .md-list__marker {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex: 0 0 auto;
+          width: 1.1em;
+          height: 1.1em;
+          margin-top: 0.15em;
+          border-radius: 999px;
+          color: var(--vscode-textLink-foreground);
+          background: color-mix(in srgb, var(--vscode-textLink-foreground) 14%, transparent);
+          transition: transform 120ms ease, background 120ms ease, color 120ms ease;
+        }
+        .md-list__item:hover .md-list__marker {
+          transform: scale(1.05);
+          background: color-mix(in srgb, var(--vscode-textLink-foreground) 22%, transparent);
+        }
+        .md-list__marker svg {
+          width: 0.9em;
+          height: 0.9em;
+        }
+        .md-list__marker--ordered {
+          font-size: 0.8em;
+          font-weight: 600;
+        }
+        .md-list__marker--task {
+          color: var(--vscode-charts-green);
+          background: color-mix(in srgb, var(--vscode-charts-green) 14%, transparent);
+        }
+        .md-list__marker--checked {
+          color: var(--vscode-charts-green);
+          background: color-mix(in srgb, var(--vscode-charts-green) 22%, transparent);
+        }
+        .md-list__body {
+          min-width: 0;
+          flex: 1 1 auto;
         }
         .md-quote {
           margin: 0.75em 0 0;
@@ -238,25 +287,6 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string): string {
       </main>
     </body>
     </html>
-  `;
-}
-
-function renderChecklist(text: string): string {
-  const items = [...text.matchAll(/^[-*]\s+\[( |x|X)\]\s+(.*)$/gm)];
-
-  if (items.length === 0) {
-    return '<p class="empty">No tasks yet.</p>';
-  }
-
-  return `
-    <ul class="task-list">
-      ${items.map((item) => `
-        <li class="${item[1].toLowerCase() === 'x' ? 'done' : ''}">
-          <span class="task-box">${item[1].toLowerCase() === 'x' ? 'x' : ''}</span>
-          <span>${escapeHtml(item[2])}</span>
-        </li>
-      `).join('')}
-    </ul>
   `;
 }
 
@@ -400,6 +430,7 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           background: var(--vscode-sideBar-background);
           border-radius: 12px;
           padding: 16px;
+          font-size: var(--vscode-editor-font-size);
         }
         .panel.active {
           display: block;
@@ -443,7 +474,55 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
         }
         .md-list {
           margin: 0.6em 0 0;
-          padding-left: 1.4em;
+          padding: 0;
+          list-style: none;
+        }
+        .md-list__item {
+          display: flex;
+          gap: 10px;
+          align-items: flex-start;
+          margin: 0 0 0.7em;
+          transition: transform 120ms ease, color 120ms ease;
+        }
+        .md-list__item:hover {
+          transform: translateX(2px);
+        }
+        .md-list__marker {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          flex: 0 0 auto;
+          width: 1.1em;
+          height: 1.1em;
+          margin-top: 0.15em;
+          border-radius: 999px;
+          color: var(--vscode-textLink-foreground);
+          background: color-mix(in srgb, var(--vscode-textLink-foreground) 14%, transparent);
+          transition: transform 120ms ease, background 120ms ease, color 120ms ease;
+        }
+        .md-list__item:hover .md-list__marker {
+          transform: scale(1.05);
+          background: color-mix(in srgb, var(--vscode-textLink-foreground) 22%, transparent);
+        }
+        .md-list__marker svg {
+          width: 0.9em;
+          height: 0.9em;
+        }
+        .md-list__marker--ordered {
+          font-size: 0.8em;
+          font-weight: 600;
+        }
+        .md-list__marker--task {
+          color: var(--vscode-charts-green);
+          background: color-mix(in srgb, var(--vscode-charts-green) 14%, transparent);
+        }
+        .md-list__marker--checked {
+          color: var(--vscode-charts-green);
+          background: color-mix(in srgb, var(--vscode-charts-green) 22%, transparent);
+        }
+        .md-list__body {
+          min-width: 0;
+          flex: 1 1 auto;
         }
         .md-quote {
           margin: 0.75em 0 0;
@@ -493,46 +572,6 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
         .empty {
           margin: 0;
           color: var(--vscode-descriptionForeground);
-        }
-        .design-grid {
-          display: grid;
-          gap: 12px;
-        }
-        .design-block {
-          border: 1px solid var(--vscode-panel-border);
-          border-radius: 10px;
-          padding: 12px;
-          background: var(--vscode-editor-background);
-        }
-        .task-list {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-          display: grid;
-          gap: 10px;
-        }
-        .task-list li {
-          display: flex;
-          gap: 10px;
-          align-items: flex-start;
-          padding: 10px 12px;
-          border: 1px solid var(--vscode-panel-border);
-          border-radius: 10px;
-          background: var(--vscode-editor-background);
-        }
-        .task-list li.done {
-          color: var(--vscode-descriptionForeground);
-        }
-        .task-box {
-          width: 18px;
-          height: 18px;
-          border: 1px solid var(--vscode-panel-border);
-          border-radius: 4px;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 0.85rem;
-          flex: 0 0 18px;
         }
         .spec-split {
           display: grid;
@@ -640,15 +679,11 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
         </section>
         <section class="panel ${change.selectedTab === 'design' ? 'active' : ''}" data-panel="design">
           <h2 class="source-section__title">${renderIcon('design')}${escapeHtml(change.design?.title ?? 'Design')}</h2>
-          <div class="design-grid">
-            <div class="design-block">
-              ${change.design?.content ? renderMarkdown(change.design.content) : '<p class="empty">No design.md</p>'}
-            </div>
-          </div>
+          ${change.design?.content ? renderMarkdown(change.design.content) : '<p class="empty">No design.md</p>'}
         </section>
         <section class="panel ${change.selectedTab === 'tasks' ? 'active' : ''}" data-panel="tasks">
           <h2 class="source-section__title">${renderIcon('tasks')}Tasks</h2>
-          ${renderChecklist(change.tasks?.content || '')}
+          ${change.tasks?.content ? renderMarkdown(change.tasks.content) : '<p class="empty">No tasks.md</p>'}
         </section>
         <section class="panel ${change.selectedTab === 'specs' ? 'active' : ''}" data-panel="specs">
           <h2 class="source-section__title">${renderIcon('specs')}Specs</h2>

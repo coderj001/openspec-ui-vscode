@@ -37,6 +37,7 @@
       {
         "viewType": "openspec.specEditor",
         "displayName": "Openspec Spec Viewer",
+        "priority": "option",
         "selector": [
           {
             "filenamePattern": "proposal.md"

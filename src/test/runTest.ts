@@ -49,6 +49,7 @@ async function main(): Promise<void> {
     assert.strictEqual(parseSpecText('/workspace/openspec/changes/archive/add-views/specs/core/spec.md', '# Archived').status, 'archive');
     assert.strictEqual(renderMarkdown('# Title\n\n- item\n\n`code` **bold**').includes('<h1 class="md-heading md-heading--1">Title</h1>'), true);
     assert.strictEqual(renderMarkdown('# Title\n\n- item\n\n`code` **bold**').includes('<code>code</code>'), true);
+    assert.strictEqual(renderMarkdown('- [x] done').includes('md-list__marker--task'), true);
 
     console.log('test: ok');
   } catch (error) {
