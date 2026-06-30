@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import { renderMarkdown } from '../editors/markdown';
+import { resolveOpenFileUri } from '../editors/open-file-target';
 import { parseSpecText, looksLikeSpec } from '../specs/parser';
 import { formatArchiveName, getChangeFolderName, getChangeRootPath, getSpecFolderName, isChangeFilePath, isChangeSpecPath, isSourceSpecPath } from '../specs/paths';
 
@@ -50,6 +51,18 @@ async function main(): Promise<void> {
     assert.strictEqual(renderMarkdown('# Title\n\n- item\n\n`code` **bold**').includes('<h1 class="md-heading md-heading--1">Title</h1>'), true);
     assert.strictEqual(renderMarkdown('# Title\n\n- item\n\n`code` **bold**').includes('<code>code</code>'), true);
     assert.strictEqual(renderMarkdown('- [x] done').includes('md-list__marker--task'), true);
+    assert.strictEqual(resolveOpenFileUri({
+      selectedTab: 'design',
+      proposal: undefined,
+      design: { uri: { toString: () => '/workspace/openspec/changes/add-views/design.md' }, title: 'Design', content: '' },
+      tasks: undefined,
+      selectedSpecUri: undefined,
+      specs: [],
+    } as unknown as Parameters<typeof resolveOpenFileUri>[0]), '/workspace/openspec/changes/add-views/design.md');
+    assert.strictEqual(resolveOpenFileUri({
+      kind: 'source',
+      uri: { toString: () => '/workspace/openspec/specs/core/spec.md' },
+    } as unknown as Parameters<typeof resolveOpenFileUri>[0]), '/workspace/openspec/specs/core/spec.md');
 
     console.log('test: ok');
   } catch (error) {

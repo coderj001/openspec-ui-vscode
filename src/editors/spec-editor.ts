@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { renderMarkdown } from './markdown';
+import { resolveOpenFileUri } from './open-file-target';
 import { specSectionNames } from '../specs/parser';
 import { ChangeDocument, readChangeDocument, readSpecDocument, SpecDocument } from '../specs/service';
 import { getSpecFolderName, isChangeFilePath } from '../specs/paths';
@@ -25,6 +26,7 @@ function renderIcon(name: string): string {
     tasks: 'M5 6h14M5 12h14M5 18h10',
     specs: 'M6 4h12v16H6z M9 8h6M9 12h6M9 16h4',
     markdown: 'M5 6h14M5 10h8M5 14h12M5 18h8',
+    file: 'M7 3h7l4 4v14H7z M14 3v4h4',
   };
 
   return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[name] ?? paths.markdown}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
@@ -60,9 +62,17 @@ function renderSourceSpecBody(spec: SpecDocument): string {
   const progress = spec.taskProgress.total === 0 ? 0 : Math.round((spec.taskProgress.completed / spec.taskProgress.total) * 100);
 
   return `
-    <h1 class="title">${renderIcon('markdown')}${escapeHtml(spec.title)}</h1>
-    <p class="meta">${escapeHtml(spec.uri.fsPath)}</p>
-    <span class="pill">${escapeHtml(spec.status)} · ${progress}% tasks done</span>
+    <div class="hero hero--source">
+      <div>
+        <h1 class="title">${renderIcon('markdown')}${escapeHtml(spec.title)}</h1>
+        <p class="meta">${escapeHtml(spec.uri.fsPath)}</p>
+        <span class="pill">${escapeHtml(spec.status)} · ${progress}% tasks done</span>
+      </div>
+      <button type="button" class="action" data-action="open-file" data-uri="${escapeHtml(spec.uri.toString())}">
+        ${renderIcon('file')}
+        <span>Open File</span>
+      </button>
+    </div>
     <section class="metrics">
       ${specSectionNames.map((section) => `
         <div class="metric">
@@ -79,7 +89,9 @@ function renderEmbeddedSpecBody(spec: SpecDocument): string {
   return renderSpecSections(spec, false);
 }
 
-function renderSourceSpec(spec: SpecDocument, cspSource: string): string {
+function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string): string {
+  const currentUri = resolveOpenFileUri(spec) ?? '';
+
   return /* html */ `
     <!doctype html>
     <html lang="en">
@@ -101,6 +113,13 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string): string {
         .shell {
           max-width: 980px;
           margin: 0 auto;
+        }
+        .hero {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: flex-start;
+          margin-bottom: 16px;
         }
         .shell,
         .source-section,
@@ -125,6 +144,26 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string): string {
           border-radius: 999px;
           color: var(--vscode-badge-foreground);
           background: var(--vscode-badge-background);
+        }
+        .action {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          border: 1px solid var(--vscode-panel-border);
+          border-radius: 8px;
+          background: var(--vscode-button-secondaryBackground);
+          color: var(--vscode-button-secondaryForeground);
+          padding: 8px 12px;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+        .action:hover,
+        .action:focus-visible {
+          border-color: var(--vscode-focusBorder);
+        }
+        .action:disabled {
+          opacity: 0.5;
+          cursor: default;
         }
         .metrics {
           display: grid;
@@ -285,6 +324,19 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string): string {
       <main class="shell">
         ${renderSourceSpecBody(spec)}
       </main>
+      <script nonce="${nonce}">
+        const vscode = acquireVsCodeApi();
+        const openFileButton = document.querySelector('[data-action="open-file"]');
+        const currentUri = ${JSON.stringify(currentUri)};
+        if (openFileButton) {
+          openFileButton.disabled = !currentUri;
+          openFileButton.addEventListener('click', () => {
+            if (currentUri) {
+              vscode.postMessage({ type: 'openCurrentFile', uri: currentUri });
+            }
+          });
+        }
+      </script>
     </body>
     </html>
   `;
@@ -354,6 +406,13 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
   const progress = change.taskProgress.total === 0
     ? '0/0'
     : `${change.taskProgress.completed}/${change.taskProgress.total}`;
+  const currentUri = resolveOpenFileUri(change) ?? '';
+  const fileTargets = {
+    proposal: change.proposal?.uri.toString() ?? '',
+    design: change.design?.uri.toString() ?? '',
+    tasks: change.tasks?.uri.toString() ?? '',
+    specs: change.selectedSpecUri?.toString() ?? change.specs[0]?.uri.toString() ?? '',
+  };
 
   return /* html */ `
     <!doctype html>
@@ -378,6 +437,10 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           padding: 20px;
         }
         .hero {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: flex-start;
           margin-bottom: 18px;
         }
         .hero h1 {
@@ -402,6 +465,26 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           border-radius: 999px;
           border: 1px solid var(--vscode-panel-border);
           background: var(--vscode-sideBar-background);
+        }
+        .action {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          border: 1px solid var(--vscode-panel-border);
+          border-radius: 8px;
+          background: var(--vscode-button-secondaryBackground);
+          color: var(--vscode-button-secondaryForeground);
+          padding: 8px 12px;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+        .action:hover,
+        .action:focus-visible {
+          border-color: var(--vscode-focusBorder);
+        }
+        .action:disabled {
+          opacity: 0.5;
+          cursor: default;
         }
         .tabs {
           display: flex;
@@ -660,13 +743,19 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
     <body>
       <main class="shell">
         <section class="hero">
-          <h1>${renderIcon('markdown')}${escapeHtml(change.name)}</h1>
-          <p>${escapeHtml(change.folderUri.fsPath)}</p>
-          <div class="meta-row">
-            <span class="pill">${escapeHtml(change.status)}</span>
-            <span class="pill">${escapeHtml(progress)} tasks</span>
-            <span class="pill">${change.specs.length} specs</span>
+          <div>
+            <h1>${renderIcon('markdown')}${escapeHtml(change.name)}</h1>
+            <p>${escapeHtml(change.folderUri.fsPath)}</p>
+            <div class="meta-row">
+              <span class="pill">${escapeHtml(change.status)}</span>
+              <span class="pill">${escapeHtml(progress)} tasks</span>
+              <span class="pill">${change.specs.length} specs</span>
+            </div>
           </div>
+          <button type="button" class="action" data-action="open-file" data-uri="${escapeHtml(currentUri)}" ${currentUri ? '' : 'disabled'}>
+            ${renderIcon('file')}
+            <span>Open File</span>
+          </button>
         </section>
         <nav class="tabs">
           ${tabs.map((tab) => `
@@ -691,15 +780,36 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
         </section>
       </main>
       <script nonce="${nonce}">
+        const vscode = acquireVsCodeApi();
         const tabs = [...document.querySelectorAll('.tab')];
         const panels = [...document.querySelectorAll('.panel')];
         const specItems = [...document.querySelectorAll('[data-spec-target]')];
         const specPanels = [...document.querySelectorAll('[data-spec-panel]')];
+        const openFileButton = document.querySelector('[data-action="open-file"]');
+        let currentUri = ${JSON.stringify(currentUri)};
+        const fileTargets = ${JSON.stringify(fileTargets)};
+        const updateOpenFileState = (uri) => {
+          currentUri = uri || '';
+          if (!openFileButton) {
+            return;
+          }
+          openFileButton.disabled = !currentUri;
+          openFileButton.setAttribute('data-uri', currentUri);
+        };
+        updateOpenFileState(currentUri);
+        if (openFileButton) {
+          openFileButton.addEventListener('click', () => {
+            if (currentUri) {
+              vscode.postMessage({ type: 'openCurrentFile', uri: currentUri });
+            }
+          });
+        }
         tabs.forEach((tab) => {
           tab.addEventListener('click', () => {
             const next = tab.getAttribute('data-tab');
             tabs.forEach((item) => item.classList.toggle('active', item === tab));
             panels.forEach((panel) => panel.classList.toggle('active', panel.getAttribute('data-panel') === next));
+            updateOpenFileState(next ? fileTargets[next] : '');
           });
         });
         specItems.forEach((item) => {
@@ -713,6 +823,7 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
             specPanels.forEach((panel) => {
               panel.classList.toggle('active', panel.getAttribute('data-spec-panel') === next);
             });
+            updateOpenFileState(next ?? '');
           });
         });
       </script>
@@ -730,9 +841,17 @@ export class OpenspecSpecEditorProvider implements vscode.CustomReadonlyEditorPr
 
   public async resolveCustomEditor(document: OpenspecDocument, webviewPanel: vscode.WebviewPanel): Promise<void> {
     webviewPanel.webview.options = {
-      enableScripts: isChangeFilePath(document.uri.fsPath),
+      enableScripts: true,
       localResourceRoots: [],
     };
+
+    webviewPanel.webview.onDidReceiveMessage((message: { type?: string; uri?: string }) => {
+      if (message.type !== 'openCurrentFile' || !message.uri) {
+        return;
+      }
+
+      void vscode.commands.executeCommand('vscode.open', vscode.Uri.parse(message.uri));
+    });
 
     if (isChangeFilePath(document.uri.fsPath)) {
       const change = await readChangeDocument(document.uri);
@@ -740,12 +859,11 @@ export class OpenspecSpecEditorProvider implements vscode.CustomReadonlyEditorPr
       webviewPanel.webview.html = change
         ? renderChangeEditor(change, webviewPanel.webview.cspSource, nonce)
         : '<html><body><p>Not an Openspec change document.</p></body></html>';
-      return;
+    } else {
+      const spec = await readSpecDocument(document.uri);
+      webviewPanel.webview.html = spec
+        ? renderSourceSpec(spec, webviewPanel.webview.cspSource, `${Date.now()}${Math.random().toString(16).slice(2)}`)
+        : '<html><body><p>Not an Openspec document.</p></body></html>';
     }
-
-    const spec = await readSpecDocument(document.uri);
-    webviewPanel.webview.html = spec
-      ? renderSourceSpec(spec, webviewPanel.webview.cspSource)
-      : '<html><body><p>Not an Openspec document.</p></body></html>';
   }
 }
