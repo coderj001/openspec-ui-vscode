@@ -88,8 +88,8 @@ function getMermaidBootScript(): string {
         };
         const getCssVar = (styles, name, fallback) => styles.getPropertyValue(name).trim() || fallback;
         const getFontSize = (styles) => {
-          const value = Number.parseFloat(getCssVar(styles, '--vscode-editor-font-size', '14'));
-          return Number.isFinite(value) ? Math.max(12, Math.min(16, value)) : 14;
+          const value = Number.parseFloat(getCssVar(styles, '--vscode-font-size', '13'));
+          return Number.isFinite(value) ? Math.max(12, Math.min(14, value)) : 13;
         };
         const isDarkColor = (color) => {
           const match = color.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/i);
@@ -100,6 +100,7 @@ function getMermaidBootScript(): string {
           const luminance = (0.2126 * Number(r)) + (0.7152 * Number(g)) + (0.0722 * Number(b));
           return luminance < 140;
         };
+        const isStateDiagramSource = (source) => /^\\s*stateDiagram(?:-v2)?\\b/i.test(source);
         const getMermaidConfig = () => {
           const styles = getComputedStyle(document.body);
           const background = getCssVar(styles, '--vscode-editorWidget-background', '#1f1f28');
@@ -109,7 +110,7 @@ function getMermaidBootScript(): string {
           const accent = getCssVar(styles, '--vscode-textLink-foreground', '#4da3ff');
           const note = getCssVar(styles, '--vscode-sideBar-background', editorBackground);
           const error = getCssVar(styles, '--vscode-errorForeground', '#f48771');
-          const fontFamily = getCssVar(styles, '--vscode-editor-font-family', getCssVar(styles, '--vscode-font-family', 'sans-serif'));
+          const fontFamily = getCssVar(styles, '--vscode-font-family', 'sans-serif');
           const fontSize = getFontSize(styles);
           const cardBackground = isDarkColor(background) ? '#f4f4f5' : '#ffffff';
           const cardText = '#111111';
@@ -134,6 +135,7 @@ function getMermaidBootScript(): string {
               tertiaryBorderColor: border,
               tertiaryTextColor: foreground,
               lineColor: accent,
+              transitionColor: accent,
               textColor: foreground,
               mainBkg: background,
               nodeBkg: cardBackground,
@@ -142,6 +144,7 @@ function getMermaidBootScript(): string {
               clusterBorder: border,
               titleColor: foreground,
               edgeLabelBackground: labelBackground,
+              labelBackgroundColor: labelBackground,
               labelTextColor: cardText,
               actorBkg: cardBackground,
               actorBorder: border,
@@ -156,6 +159,15 @@ function getMermaidBootScript(): string {
               noteBkgColor: note,
               noteBorderColor: border,
               noteTextColor: foreground,
+              stateBkg: cardBackground,
+              stateBorder: border,
+              stateLabelColor: cardText,
+              transitionLabelColor: foreground,
+              compositeBackground: editorBackground,
+              compositeTitleBackground: note,
+              altBackground: note,
+              specialStateColor: accent,
+              innerEndBackground: cardBackground,
               activationBorderColor: border,
               activationBkgColor: note,
               sequenceNumberColor: foreground,
@@ -176,7 +188,7 @@ function getMermaidBootScript(): string {
             },
           };
         };
-        const applyMermaidSvgTheme = (preview) => {
+        const applyMermaidSvgTheme = (preview, source) => {
           const svg = preview.querySelector('svg');
           if (!svg) {
             return;
@@ -189,8 +201,6 @@ function getMermaidBootScript(): string {
           const border = getCssVar(styles, '--vscode-panel-border', '#3f3f46');
           const accent = getCssVar(styles, '--vscode-textLink-foreground', '#4da3ff');
           const note = getCssVar(styles, '--vscode-sideBar-background', editorBackground);
-          const fontFamily = getCssVar(styles, '--vscode-editor-font-family', getCssVar(styles, '--vscode-font-family', 'sans-serif'));
-          const fontSize = getFontSize(styles);
           const cardBackground = isDarkColor(background) ? '#f4f4f5' : '#ffffff';
           const cardText = '#111111';
           const labelBackground = isDarkColor(background) ? '#eef2a3' : '#f4f1a6';
@@ -199,6 +209,70 @@ function getMermaidBootScript(): string {
               Object.entries(styleMap).forEach(([key, value]) => {
                 node.style.setProperty(key, value, 'important');
               });
+            });
+          };
+          const getSvgIntrinsicWidth = () => {
+            const width = Number.parseFloat(svg.getAttribute('width') || '');
+            if (Number.isFinite(width) && width > 0) {
+              return width;
+            }
+
+            const viewBox = svg.getAttribute('viewBox')?.trim().split(/\\s+/).map(Number);
+            const viewBoxWidth = viewBox?.[2];
+            return Number.isFinite(viewBoxWidth) && viewBoxWidth > 0 ? viewBoxWidth : undefined;
+          };
+          const applyStateDiagramTheme = () => {
+            applyInline('.transition, .edgePath path, path.transition, .flowchart-link', {
+              fill: 'none',
+              stroke: accent,
+            });
+            applyInline('marker path, [id$="-barbEnd"], [id$="-dependencyStart"], [id$="-dependencyEnd"]', {
+              fill: accent,
+              stroke: accent,
+            });
+            applyInline('.statediagram-state rect, .stateGroup rect, .node rect.basic', {
+              fill: cardBackground,
+              stroke: border,
+            });
+            applyInline('.statediagram-cluster rect, .cluster rect, .stateGroup .composit, .stateGroup .alt-composit', {
+              fill: note,
+              stroke: border,
+            });
+            applyInline('.statediagram-cluster .inner', {
+              fill: editorBackground,
+              stroke: border,
+            });
+            applyInline('.statediagram-state .divider, .stateGroup line', {
+              fill: 'none',
+              stroke: border,
+            });
+            applyInline('.node circle.state-start, .node .fork-join', {
+              fill: accent,
+              stroke: accent,
+            });
+            applyInline('.node circle.state-end', {
+              fill: cardText,
+              stroke: cardBackground,
+            });
+            applyInline('.end-state-inner', {
+              fill: cardBackground,
+              stroke: cardBackground,
+            });
+            applyInline('.edgeLabel rect, .stateLabel .box, .labelBox, .label-container', {
+              fill: labelBackground,
+              stroke: 'none',
+            });
+            applyInline('.statediagram-state text, .statediagram-state tspan, .stateGroup text, .stateGroup tspan, .nodeLabel, .nodeLabel *, .stateLabel, .stateLabel *', {
+              fill: cardText,
+              color: cardText,
+            });
+            applyInline('.statediagram-note rect, .state-note', {
+              fill: note,
+              stroke: border,
+            });
+            applyInline('.statediagram-note text, .statediagram-note .nodeLabel, .state-note text', {
+              fill: foreground,
+              color: foreground,
             });
           };
           const viewBox = svg.getAttribute('viewBox');
@@ -212,17 +286,23 @@ function getMermaidBootScript(): string {
           svg.removeAttribute('height');
           svg.removeAttribute('width');
           svg.setAttribute('preserveAspectRatio', 'xMidYMin meet');
+          const intrinsicWidth = getSvgIntrinsicWidth();
           svg.style.width = '100%';
-          svg.style.maxWidth = '100%';
+          svg.style.maxWidth = intrinsicWidth ? Math.min(Math.ceil(intrinsicWidth), 880) + 'px' : '100%';
           svg.style.height = 'auto';
+          applyInline('.edgePath path, path.flowchart-link, .flowchart-link, .relationshipLine, .transition', {
+            fill: 'none',
+            stroke: accent,
+          });
+
+          if (isStateDiagramSource(source)) {
+            applyStateDiagramTheme();
+            return;
+          }
 
           const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
           style.textContent = \`
-            svg {
-              font-family: \${fontFamily} !important;
-              font-size: \${fontSize}px !important;
-            }
-            text, tspan, foreignObject, .edgeLabel, .messageText, .labelText, .loopText, .noteText {
+            text, tspan, foreignObject, .messageText, .noteText {
               fill: \${foreground} !important;
               color: \${foreground} !important;
             }
@@ -230,7 +310,7 @@ function getMermaidBootScript(): string {
               fill: \${cardBackground} !important;
               stroke: \${border} !important;
             }
-            .nodeLabel, .nodeLabel *, .labelText, .labelText *, .actor + text, text.actor, .actor text {
+            .nodeLabel, .nodeLabel *, .actor + text, text.actor, .actor text {
               fill: \${cardText} !important;
               color: \${cardText} !important;
               text-anchor: middle !important;
@@ -250,6 +330,7 @@ function getMermaidBootScript(): string {
             }
             .edgePath path, .flowchart-link, .relationshipLine, .entityBox, .entityLabel {
               stroke: \${accent} !important;
+              fill: none !important;
             }
             .labelBox, .label-container {
               fill: \${labelBackground} !important;
@@ -265,7 +346,7 @@ function getMermaidBootScript(): string {
             }
           \`;
           svg.append(style);
-          applyInline('text.actor, text.actor > tspan, .actor + text, .actor + text > tspan, .nodeLabel, .nodeLabel *, .labelText, .labelText *, .labelText > tspan', {
+          applyInline('text.actor, text.actor > tspan, .actor + text, .actor + text > tspan, .nodeLabel, .nodeLabel *', {
             fill: cardText,
             color: cardText,
             'text-anchor': 'middle',
@@ -313,7 +394,7 @@ function getMermaidBootScript(): string {
             try {
               const result = await mermaidApi.render('openspec-mermaid-' + index + '-' + Date.now(), source);
               preview.innerHTML = '<div class="md-mermaid__canvas">' + result.svg + '</div>';
-              applyMermaidSvgTheme(preview);
+              applyMermaidSvgTheme(preview, source);
               if (fallback) {
                 fallback.hidden = true;
               }
@@ -368,12 +449,6 @@ function getMermaidCss(): string {
           max-width: 100%;
           height: auto;
           margin: 0 auto;
-        }
-        .md-mermaid__preview svg text,
-        .md-mermaid__preview svg tspan,
-        .md-mermaid__preview svg foreignObject {
-          fill: var(--vscode-editor-foreground);
-          color: var(--vscode-editor-foreground);
         }
         .md-mermaid__preview svg line,
         .md-mermaid__preview svg path,

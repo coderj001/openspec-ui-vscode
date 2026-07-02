@@ -78,7 +78,10 @@
     "watch": "tsc -watch -p ./",
     "vscode:prepublish": "npm run compile",
     "test": "npm run compile && node ./out/test/runTest.js",
-    "lint": "eslint src --ext ts"
+    "lint": "eslint src --ext ts",
+    "vsix:build": "npx @vscode/vsce package --allow-missing-repository",
+    "vsceBuild": "npm run vsix:build",
+    "vscePublish": "npx @vscode/vsce publish --allow-missing-repository"
   },
   "dependencies": {
     "mermaid": "^11.12.0"
