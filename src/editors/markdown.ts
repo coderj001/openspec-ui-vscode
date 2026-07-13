@@ -54,11 +54,11 @@ function getReadableTextColor(background: string): '#000000' | '#ffffff' {
 function renderColorCode(code: string): string {
   const trimmed = code.trim();
   if (!isHexColor(trimmed)) {
-    return `<code>${escapeHtml(code)}</code>`;
+    return `<code class="md-code__inline">${escapeHtml(code)}</code>`;
   }
 
   const textColor = getReadableTextColor(trimmed);
-  return `<code class="md-code__color" data-color="${escapeHtml(trimmed)}" data-contrast="${textColor === '#000000' ? 'dark' : 'light'}">${escapeHtml(trimmed)}</code>`;
+  return `<code class="md-code__inline md-code__color" data-color="${escapeHtml(trimmed)}" data-contrast="${textColor === '#000000' ? 'dark' : 'light'}">${escapeHtml(trimmed)}</code>`;
 }
 
 function renderColorCodesInText(html: string): string {

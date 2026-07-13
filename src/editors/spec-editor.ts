@@ -674,15 +674,21 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string, 
         }
         .md-heading--1 {
           font-size: 1.4rem;
+          color: var(--vscode-textLink-foreground);
         }
         .md-heading--2 {
           font-size: 1.15rem;
+          color: var(--vscode-charts-blue);
         }
-        .md-heading--3,
+        .md-heading--3 {
+          font-size: 1rem;
+          color: var(--vscode-charts-green);
+        }
         .md-heading--4,
         .md-heading--5,
         .md-heading--6 {
-          font-size: 1rem;
+          font-size: 0.95rem;
+          color: var(--vscode-charts-orange);
         }
         .md-heading--scenario {
           color: var(--vscode-textLink-foreground);
@@ -785,6 +791,18 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string, 
           border-radius: 6px;
           background: var(--vscode-editorWidget-background);
           border: 1px solid var(--vscode-panel-border);
+        }
+        .md-code__inline {
+          color: var(--vscode-textLink-foreground);
+          font-weight: 400;
+        }
+        .md-code__color {
+          display: inline-flex;
+          align-items: center;
+          padding: 0.08em 0.35em;
+          border-radius: 6px;
+          border: 1px solid transparent;
+          font-weight: 600;
         }
         pre {
           margin: 0;
@@ -1309,15 +1327,21 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
         }
         .md-heading--1 {
           font-size: 1.4rem;
+          color: var(--vscode-textLink-foreground);
         }
         .md-heading--2 {
           font-size: 1.15rem;
+          color: var(--vscode-charts-blue);
         }
-        .md-heading--3,
+        .md-heading--3 {
+          font-size: 1rem;
+          color: var(--vscode-charts-green);
+        }
         .md-heading--4,
         .md-heading--5,
         .md-heading--6 {
-          font-size: 1rem;
+          font-size: 0.95rem;
+          color: var(--vscode-charts-orange);
         }
         .md-heading--scenario {
           color: var(--vscode-textLink-foreground);
@@ -1420,6 +1444,10 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           border-radius: 6px;
           background: var(--vscode-editorWidget-background);
           border: 1px solid var(--vscode-panel-border);
+        }
+        .md-code__inline {
+          color: var(--vscode-textLink-foreground);
+          font-weight: 400;
         }
         .md-code__color {
           display: inline-flex;
