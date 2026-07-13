@@ -7,6 +7,73 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+function isHexColor(value: string): boolean {
+  return /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6,8})$/.test(value.trim());
+}
+
+function hexToRgb(value: string): { readonly r: number; readonly g: number; readonly b: number } | null {
+  const hex = value.trim().slice(1);
+  const expanded = hex.length === 3 || hex.length === 4
+    ? hex.split('').slice(0, 3).map((char) => char + char).join('')
+    : hex.slice(0, 6);
+
+  if (expanded.length !== 6) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(expanded, 16);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return {
+    r: (parsed >> 16) & 0xff,
+    g: (parsed >> 8) & 0xff,
+    b: parsed & 0xff,
+  };
+}
+
+function getReadableTextColor(background: string): '#000000' | '#ffffff' {
+  const rgb = hexToRgb(background);
+  if (!rgb) {
+    return '#000000';
+  }
+
+  const toLinear = (channel: number): number => {
+    const normalized = channel / 255;
+    return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+
+  const luminance = (0.2126 * toLinear(rgb.r)) + (0.7152 * toLinear(rgb.g)) + (0.0722 * toLinear(rgb.b));
+  const blackContrast = (luminance + 0.05) / 0.05;
+  const whiteContrast = 1.05 / (luminance + 0.05);
+
+  return blackContrast >= whiteContrast ? '#000000' : '#ffffff';
+}
+
+function renderColorCode(code: string): string {
+  const trimmed = code.trim();
+  if (!isHexColor(trimmed)) {
+    return `<code>${escapeHtml(code)}</code>`;
+  }
+
+  const textColor = getReadableTextColor(trimmed);
+  return `<code class="md-code__color" data-color="${escapeHtml(trimmed)}" data-contrast="${textColor === '#000000' ? 'dark' : 'light'}">${escapeHtml(trimmed)}</code>`;
+}
+
+function renderColorCodesInText(html: string): string {
+  return html
+    .split(/(<[^>]+>)/g)
+    .map((segment) => {
+      if (segment.startsWith('<')) {
+        return segment;
+      }
+
+      return segment.replace(/(^|[^A-Za-z0-9_-])(#[0-9a-fA-F]{3,4}|#[0-9a-fA-F]{6,8})(?![A-Za-z0-9_-])/g, (_, prefix: string, color: string) => `${prefix}${renderColorCode(color)}`);
+    })
+    .join('');
+}
+
 type TableAlignment = 'left' | 'center' | 'right';
 
 function splitTableCells(line: string): string[] {
@@ -86,7 +153,7 @@ function renderInlineMarkdown(text: string): string {
   const codeSpans: string[] = [];
   const token = '%%CODE%%';
   const withCode = text.replace(/`([^`]+)`/g, (_, code: string) => {
-    codeSpans.push(`<code>${escapeHtml(code)}</code>`);
+    codeSpans.push(renderColorCode(code));
     return token;
   });
 
@@ -94,6 +161,7 @@ function renderInlineMarkdown(text: string): string {
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label: string, href: string) => `<a href="${escapeHtml(href.trim())}">${label}</a>`);
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  html = renderColorCodesInText(html);
 
   let index = 0;
 

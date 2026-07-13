@@ -433,6 +433,24 @@ function getMermaidBootScript(): string {
             }
           }
         };
+        const applyColorCodeTheme = () => {
+          document.querySelectorAll('.md-code__color[data-color]').forEach((node) => {
+            if (!(node instanceof HTMLElement)) {
+              return;
+            }
+
+            const color = node.getAttribute('data-color') || '';
+            const contrast = node.getAttribute('data-contrast') || 'dark';
+            if (!/^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6,8})$/.test(color)) {
+              return;
+            }
+
+            node.style.backgroundColor = color;
+            node.style.color = contrast === 'dark' ? '#000000' : '#ffffff';
+            node.style.borderColor = contrast === 'dark' ? 'rgba(0, 0, 0, 0.24)' : 'rgba(255, 255, 255, 0.22)';
+          });
+        };
+        applyColorCodeTheme();
   `;
 }
 
@@ -1402,6 +1420,15 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           border-radius: 6px;
           background: var(--vscode-editorWidget-background);
           border: 1px solid var(--vscode-panel-border);
+        }
+        .md-code__color {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0.08em 0.35em;
+          border-radius: 6px;
+          border: 1px solid transparent;
+          font-weight: 600;
         }
         .md-table-wrap {
           width: 100%;

@@ -52,6 +52,13 @@ async function main(): Promise<void> {
     assert.strictEqual(renderMarkdown('# Title\n\n- item\n\n`code` **bold**').includes('<h1 class="md-heading md-heading--1">Title</h1>'), true);
     assert.strictEqual(renderMarkdown('# Title\n\n- item\n\n`code` **bold**').includes('<code>code</code>'), true);
     assert.strictEqual(renderMarkdown('- [x] done').includes('md-list__marker--task'), true);
+    assert.strictEqual(renderMarkdown('`#FFF`').includes('class="md-code__color"'), true);
+    assert.strictEqual(renderMarkdown('`#FFF`').includes('data-color="#FFF"'), true);
+    assert.strictEqual(renderMarkdown('`#FFF`').includes('data-contrast="dark"'), true);
+    assert.strictEqual(renderMarkdown('`#111`').includes('data-contrast="light"'), true);
+    assert.strictEqual(renderMarkdown('`#cb8b8bff`').includes('data-color="#cb8b8bff"'), true);
+    assert.strictEqual(renderCommentableMarkdown('#FFF The DPI audit').includes('md-code__color'), true);
+    assert.strictEqual(renderCommentableMarkdown('#cb8b8bff The DPI audit').includes('md-code__color'), true);
     assert.strictEqual(renderMarkdown('| Name | Value |\n| --- | :---: |\n| A | B |').includes('<table class="md-table">'), true);
     assert.strictEqual(renderMarkdown('| Name | Value |\n| --- | :---: |\n| A | B |').includes('style="text-align:center"'), true);
     assert.strictEqual(
