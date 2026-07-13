@@ -319,8 +319,8 @@ function getMermaidBootScript(): string {
             return;
           }
 
-          preview.style.overflow = 'hidden';
-          svg.style.maxWidth = intrinsicWidth ? Math.min(Math.ceil(intrinsicWidth), 880) + 'px' : '100%';
+          preview.style.overflow = 'auto';
+          svg.style.maxWidth = intrinsicWidth ? Math.ceil(intrinsicWidth) + 'px' : '100%';
 
           const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
           style.textContent = \`
@@ -354,6 +354,14 @@ function getMermaidBootScript(): string {
               stroke: \${accent} !important;
               fill: none !important;
             }
+            .edgeLabel rect, .edgeLabel polygon, .edgeLabel path, .edgeLabel .labelBox, .edgeLabel .label-container {
+              fill: \${labelBackground} !important;
+              stroke: \${border} !important;
+            }
+            .edgeLabel text, .edgeLabel tspan, .edgeLabel foreignObject, .edgeLabel span {
+              fill: \${cardText} !important;
+              color: \${cardText} !important;
+            }
             .labelBox, .label-container {
               fill: \${labelBackground} !important;
               stroke: \${border} !important;
@@ -381,6 +389,14 @@ function getMermaidBootScript(): string {
           applyInline('.labelBox, .label-container', {
             fill: labelBackground,
             stroke: border,
+          });
+          applyInline('.edgeLabel rect, .edgeLabel polygon, .edgeLabel path, .edgeLabel .labelBox, .edgeLabel .label-container', {
+            fill: labelBackground,
+            stroke: border,
+          });
+          applyInline('.edgeLabel text, .edgeLabel tspan, .edgeLabel foreignObject, .edgeLabel span', {
+            fill: cardText,
+            color: cardText,
           });
         };
 
@@ -760,7 +776,17 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string, 
           border: 1px solid var(--vscode-panel-border);
         }
         .md-code--line {
-          padding: 8px 12px;
+          padding: 2px 12px;
+          border: 0;
+          border-radius: 0;
+          background: transparent;
+        }
+        .md-line--code .md-line__content {
+          min-height: 1.55em;
+          align-items: stretch;
+        }
+        .md-line--code .md-code code {
+          background: transparent;
         }
         .md-code-fence {
           display: inline-flex;
@@ -1413,7 +1439,17 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           border: 1px solid var(--vscode-panel-border);
         }
         .md-code--line {
-          padding: 8px 12px;
+          padding: 2px 12px;
+          border: 0;
+          border-radius: 0;
+          background: transparent;
+        }
+        .md-line--code .md-line__content {
+          min-height: 1.55em;
+          align-items: stretch;
+        }
+        .md-line--code .md-code code {
+          background: transparent;
         }
         .md-code-fence {
           display: inline-flex;
