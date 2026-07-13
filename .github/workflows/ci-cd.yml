@@ -1,0 +1,66 @@
+name: ci-cd
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile and test
+        run: npm test
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Package VSIX
+        run: |
+          find . -maxdepth 1 -name '*.vsix' -delete
+          npx @vscode/vsce package --allow-missing-repository
+          mkdir -p release
+          VSIX_FILE=$(find . -maxdepth 1 -name '*.vsix' -print -quit)
+          test -n "$VSIX_FILE"
+          mv "$VSIX_FILE" release/
+          VSIX_FILE=$(find release -maxdepth 1 -name '*.vsix' -print -quit)
+          echo "VSIX_FILE=$VSIX_FILE" >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.VSIX_FILE }}
+          generate_release_notes: true
