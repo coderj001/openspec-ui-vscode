@@ -110,7 +110,8 @@ function getMermaidBootScript(): string {
           const accent = getCssVar(styles, '--vscode-textLink-foreground', '#4da3ff');
           const note = getCssVar(styles, '--vscode-sideBar-background', editorBackground);
           const error = getCssVar(styles, '--vscode-errorForeground', '#f48771');
-          const fontFamily = getCssVar(styles, '--vscode-font-family', 'sans-serif');
+          // Mermaid state diagrams are sensitive to font metrics; use a stable UI stack.
+          const fontFamily = 'Arial, "Helvetica Neue", Helvetica, sans-serif';
           const fontSize = getFontSize(styles);
           const cardBackground = isDarkColor(background) ? '#f4f4f5' : '#ffffff';
           const cardText = '#111111';
@@ -221,6 +222,20 @@ function getMermaidBootScript(): string {
             const viewBoxWidth = viewBox?.[2];
             return Number.isFinite(viewBoxWidth) && viewBoxWidth > 0 ? viewBoxWidth : undefined;
           };
+          const expandSvgViewBox = (paddingX, paddingY) => {
+            const parts = svg.getAttribute('viewBox')?.trim().split(/\\s+/).map(Number);
+            if (!parts || parts.length !== 4 || parts.some((part) => !Number.isFinite(part))) {
+              return;
+            }
+
+            const [x, y, width, height] = parts;
+            svg.setAttribute('viewBox', [
+              x - paddingX,
+              y - paddingY,
+              width + (paddingX * 2),
+              height + (paddingY * 2),
+            ].join(' '));
+          };
           const applyStateDiagramTheme = () => {
             applyInline('.transition, .edgePath path, path.transition, .flowchart-link', {
               fill: 'none',
@@ -287,18 +302,25 @@ function getMermaidBootScript(): string {
           svg.removeAttribute('width');
           svg.setAttribute('preserveAspectRatio', 'xMidYMin meet');
           const intrinsicWidth = getSvgIntrinsicWidth();
+          const stateDiagram = isStateDiagramSource(source);
           svg.style.width = '100%';
-          svg.style.maxWidth = intrinsicWidth ? Math.min(Math.ceil(intrinsicWidth), 880) + 'px' : '100%';
           svg.style.height = 'auto';
           applyInline('.edgePath path, path.flowchart-link, .flowchart-link, .relationshipLine, .transition', {
             fill: 'none',
             stroke: accent,
           });
 
-          if (isStateDiagramSource(source)) {
+          if (stateDiagram) {
+            expandSvgViewBox(32, 24);
+            preview.style.overflowX = 'auto';
+            preview.style.overflowY = 'hidden';
+            svg.style.maxWidth = intrinsicWidth ? Math.ceil(intrinsicWidth) + 'px' : 'none';
             applyStateDiagramTheme();
             return;
           }
+
+          preview.style.overflow = 'hidden';
+          svg.style.maxWidth = intrinsicWidth ? Math.min(Math.ceil(intrinsicWidth), 880) + 'px' : '100%';
 
           const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
           style.textContent = \`
