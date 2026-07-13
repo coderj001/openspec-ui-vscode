@@ -7,6 +7,81 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+type TableAlignment = 'left' | 'center' | 'right';
+
+function splitTableCells(line: string): string[] {
+  const trimmed = line.trim();
+  const withoutLeadingPipe = trimmed.startsWith('|') ? trimmed.slice(1) : trimmed;
+  const withoutOuterPipes = withoutLeadingPipe.endsWith('|') ? withoutLeadingPipe.slice(0, -1) : withoutLeadingPipe;
+
+  return withoutOuterPipes.split('|').map((cell) => cell.trim());
+}
+
+function parseTableAlignment(cell: string): TableAlignment | undefined | null {
+  const normalized = cell.replace(/\s+/g, '');
+
+  if (/^:-{3,}:$/.test(normalized)) {
+    return 'center';
+  }
+
+  if (/^:-{3,}$/.test(normalized)) {
+    return 'left';
+  }
+
+  if (/^-{3,}:$/.test(normalized)) {
+    return 'right';
+  }
+
+  if (/^-{3,}$/.test(normalized)) {
+    return undefined;
+  }
+
+  return null;
+}
+
+function renderTableRow(tag: 'th' | 'td', cells: string[], alignments: Array<TableAlignment | undefined>): string {
+  return `<tr>${cells.map((cell, index) => {
+    const alignment = alignments[index];
+    return `<${tag}${alignment ? ` style="text-align:${alignment}"` : ''}>${renderInlineMarkdown(cell)}</${tag}>`;
+  }).join('')}</tr>`;
+}
+
+function tryRenderTable(lines: string[], startIndex: number): { readonly html: string; readonly lineCount: number } | null {
+  if (startIndex + 1 >= lines.length) {
+    return null;
+  }
+
+  const headerLine = lines[startIndex].trim();
+  const separatorLine = lines[startIndex + 1].trim();
+  if (!headerLine.includes('|') || !separatorLine.includes('-')) {
+    return null;
+  }
+
+  const headerCells = splitTableCells(headerLine);
+  const alignments = splitTableCells(separatorLine).map(parseTableAlignment);
+  if (headerCells.length < 2 || alignments.length !== headerCells.length || alignments.some((alignment) => alignment === null)) {
+    return null;
+  }
+
+  const rows: string[][] = [headerCells];
+  let index = startIndex + 2;
+
+  while (index < lines.length) {
+    const rowLine = lines[index].trim();
+    if (!rowLine || !rowLine.includes('|')) {
+      break;
+    }
+
+    rows.push(splitTableCells(rowLine));
+    index += 1;
+  }
+
+  const body = rows.slice(1);
+  const html = `<table class="md-table"><thead>${renderTableRow('th', rows[0], alignments as Array<TableAlignment | undefined>)}</thead>${body.length === 0 ? '' : `<tbody>${body.map((row) => renderTableRow('td', row, alignments as Array<TableAlignment | undefined>)).join('')}</tbody>`}</table>`;
+
+  return { html, lineCount: rows.length + 1 };
+}
+
 function renderInlineMarkdown(text: string): string {
   const codeSpans: string[] = [];
   const token = '%%CODE%%';
@@ -102,7 +177,8 @@ export function renderMarkdown(text: string): string {
     inCode = false;
   };
 
-  for (const rawLine of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const rawLine = lines[index];
     const line = rawLine.trimEnd();
     const fenceLine = rawLine.trim();
 
@@ -142,6 +218,16 @@ export function renderMarkdown(text: string): string {
       const headingText = renderInlineMarkdown(headingMatch[2].trim());
       const headingClass = level === 4 && /^scenario\s*:/i.test(headingMatch[2]) ? ' md-heading--scenario' : '';
       blocks.push(`<h${level} class="md-heading md-heading--${level}${headingClass}">${headingText}</h${level}>`);
+      continue;
+    }
+
+    const table = tryRenderTable(lines, index);
+    if (table) {
+      flushParagraph();
+      flushList();
+      flushQuote();
+      blocks.push(table.html);
+      index += table.lineCount - 1;
       continue;
     }
 
@@ -229,6 +315,10 @@ function renderMermaidBlock(lineNumber: number, source: string): string {
   );
 }
 
+function renderTableBlock(lineNumber: number, html: string): string {
+  return renderCommentLine(lineNumber, `<div class="md-table-wrap">${html}</div>`, 'md-line--table');
+}
+
 export function renderCommentableMarkdown(text: string): string {
   const lines = text.replace(/\r\n/g, '\n').split('\n');
   const rendered: string[] = [];
@@ -288,6 +378,13 @@ export function renderCommentableMarkdown(text: string): string {
       const headingText = renderInlineMarkdown(headingMatch[2].trim());
       const headingClass = level === 4 && /^scenario\s*:/i.test(headingMatch[2]) ? ' md-heading--scenario' : '';
       rendered.push(renderCommentLine(lineNumber, `<h${level} class="md-heading md-heading--${level}${headingClass}">${headingText}</h${level}>`));
+      continue;
+    }
+
+    const table = tryRenderTable(lines, index);
+    if (table) {
+      rendered.push(renderTableBlock(lineNumber, table.html));
+      index += table.lineCount - 1;
       continue;
     }
 

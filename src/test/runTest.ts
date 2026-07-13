@@ -52,6 +52,8 @@ async function main(): Promise<void> {
     assert.strictEqual(renderMarkdown('# Title\n\n- item\n\n`code` **bold**').includes('<h1 class="md-heading md-heading--1">Title</h1>'), true);
     assert.strictEqual(renderMarkdown('# Title\n\n- item\n\n`code` **bold**').includes('<code>code</code>'), true);
     assert.strictEqual(renderMarkdown('- [x] done').includes('md-list__marker--task'), true);
+    assert.strictEqual(renderMarkdown('| Name | Value |\n| --- | :---: |\n| A | B |').includes('<table class="md-table">'), true);
+    assert.strictEqual(renderMarkdown('| Name | Value |\n| --- | :---: |\n| A | B |').includes('style="text-align:center"'), true);
     assert.strictEqual(
       renderCommentableMarkdown('```mermaid\ngraph TD\nA-->B\n```').includes('<pre class="md-mermaid__source" data-mermaid-source hidden>graph TD\nA--&gt;B</pre>'),
       true,
@@ -72,6 +74,8 @@ async function main(): Promise<void> {
       renderCommentableMarkdown('```mermaid\ngraph TD\nA-->B\n  ```\nAfter').includes('<pre class="md-mermaid__source" data-mermaid-source hidden>graph TD\nA--&gt;B</pre>'),
       true,
     );
+    assert.strictEqual(renderCommentableMarkdown('| Name | Value |\n| --- | --- |\n| A | B |').includes('md-table-wrap'), true);
+    assert.strictEqual(renderCommentableMarkdown('| Name | Value |\n| --- | --- |\n| A | B |').includes('data-line="1"'), true);
     assert.strictEqual(getCommentFileLabel('/workspace/openspec/changes/add-views/design.md'), 'design.md');
     assert.strictEqual(getCommentFileLabel('/workspace/openspec/changes/add-views/specs/catalog-management/spec.md'), 'catalog-management/spec.md');
     assert.strictEqual(formatCommentExport([

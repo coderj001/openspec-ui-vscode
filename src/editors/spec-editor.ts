@@ -776,12 +776,54 @@ function renderSourceSpec(spec: SpecDocument, cspSource: string, nonce: string, 
           font-size: var(--vscode-editor-font-size);
           line-height: 1.55;
         }
+        .md-table-wrap {
+          width: 100%;
+          overflow-x: auto;
+          margin-top: 0.2em;
+        }
+        .md-table {
+          width: 100%;
+          min-width: 100%;
+          border-collapse: separate;
+          border-spacing: 0;
+          border: 1px solid var(--vscode-panel-border);
+          border-radius: 10px;
+          overflow: hidden;
+          background: var(--vscode-editorWidget-background);
+          font-size: 0.95em;
+        }
+        .md-table th,
+        .md-table td {
+          padding: 0.65em 0.8em;
+          border-right: 1px solid var(--vscode-panel-border);
+          border-bottom: 1px solid var(--vscode-panel-border);
+          text-align: left;
+          vertical-align: top;
+        }
+        .md-table th:last-child,
+        .md-table td:last-child {
+          border-right: 0;
+        }
+        .md-table tr:last-child td,
+        .md-table tr:last-child th {
+          border-bottom: 0;
+        }
+        .md-table th {
+          background: color-mix(in srgb, var(--vscode-textLink-foreground) 10%, var(--vscode-editorWidget-background));
+          font-weight: 600;
+        }
+        .md-table tbody tr:nth-child(even) td {
+          background: color-mix(in srgb, var(--vscode-editorWidget-background) 72%, var(--vscode-sideBar-background));
+        }
         .md-line {
           display: grid;
           grid-template-columns: 56px minmax(0, 1fr);
           gap: 12px;
           align-items: start;
           padding: 1px 0;
+        }
+        .md-line--table .md-line__content {
+          align-items: stretch;
         }
         .md-line:hover .md-line__comment-trigger,
         .md-line--active .md-line__comment-trigger {
@@ -1360,6 +1402,45 @@ function renderChangeEditor(change: ChangeDocument, cspSource: string, nonce: st
           border-radius: 6px;
           background: var(--vscode-editorWidget-background);
           border: 1px solid var(--vscode-panel-border);
+        }
+        .md-table-wrap {
+          width: 100%;
+          overflow-x: auto;
+          margin-top: 0.2em;
+        }
+        .md-table {
+          width: 100%;
+          min-width: 100%;
+          border-collapse: separate;
+          border-spacing: 0;
+          border: 1px solid var(--vscode-panel-border);
+          border-radius: 10px;
+          overflow: hidden;
+          background: var(--vscode-editorWidget-background);
+          font-size: 0.95em;
+        }
+        .md-table th,
+        .md-table td {
+          padding: 0.65em 0.8em;
+          border-right: 1px solid var(--vscode-panel-border);
+          border-bottom: 1px solid var(--vscode-panel-border);
+          text-align: left;
+          vertical-align: top;
+        }
+        .md-table th:last-child,
+        .md-table td:last-child {
+          border-right: 0;
+        }
+        .md-table tr:last-child td,
+        .md-table tr:last-child th {
+          border-bottom: 0;
+        }
+        .md-table th {
+          background: color-mix(in srgb, var(--vscode-textLink-foreground) 10%, var(--vscode-editorWidget-background));
+          font-weight: 600;
+        }
+        .md-table tbody tr:nth-child(even) td {
+          background: color-mix(in srgb, var(--vscode-editorWidget-background) 72%, var(--vscode-sideBar-background));
         }
         .panel pre {
           margin: 0;
