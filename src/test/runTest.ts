@@ -3,6 +3,7 @@ import * as assert from 'assert';
 import { renderCommentableMarkdown, renderMarkdown } from '../editors/markdown';
 import { resolveOpenFileUri } from '../editors/open-file-target';
 import { parseSpecText, looksLikeSpec } from '../specs/parser';
+import { compareChangeSortKey, parseFolderDateTimestamp } from '../specs/change-sort';
 import { formatArchiveName, getChangeFolderName, getChangeRootPath, getSpecFolderName, isChangeFilePath, isChangeSpecPath, isSourceSpecPath } from '../specs/paths';
 
 async function main(): Promise<void> {
@@ -48,6 +49,20 @@ async function main(): Promise<void> {
     assert.strictEqual(getSpecFolderName('/workspace/openspec/changes/add-views/specs/catalog-management/spec.md'), 'catalog-management');
     assert.strictEqual(formatArchiveName('2026-06-09-browser-graph-bearer-auth'), 'browser-graph-bearer-auth');
     assert.strictEqual(formatArchiveName('browser-graph-bearer-auth'), 'browser-graph-bearer-auth');
+    assert.strictEqual(parseFolderDateTimestamp('2026-06-09-browser-graph-bearer-auth'), Date.UTC(2026, 5, 9));
+    assert.strictEqual(parseFolderDateTimestamp('browser-graph-bearer-auth'), null);
+    assert.strictEqual(compareChangeSortKey(
+      { name: 'older', folderTimestamp: 1, gitTimestamp: 1, dateTimestamp: 1 },
+      { name: 'newer', folderTimestamp: 2, gitTimestamp: 9999, dateTimestamp: 9999 },
+    ) > 0, true);
+    assert.strictEqual(compareChangeSortKey(
+      { name: 'git-newer', folderTimestamp: null, gitTimestamp: 2, dateTimestamp: 1 },
+      { name: 'git-older', folderTimestamp: null, gitTimestamp: 1, dateTimestamp: 9999 },
+    ) < 0, true);
+    assert.strictEqual(compareChangeSortKey(
+      { name: 'a', folderTimestamp: null, gitTimestamp: null, dateTimestamp: null },
+      { name: 'b', folderTimestamp: null, gitTimestamp: null, dateTimestamp: null },
+    ) < 0, true);
     assert.strictEqual(parseSpecText('/workspace/openspec/changes/archive/add-views/specs/core/spec.md', '# Archived').status, 'archive');
     assert.strictEqual(renderMarkdown('# Title\n\n- item\n\n`code` **bold**').includes('<h1 class="md-heading md-heading--1">Title</h1>'), true);
     assert.strictEqual(renderMarkdown('# Title\n\n- item\n\n`code` **bold**').includes('<code class="md-code__inline">code</code>'), true);

@@ -1,7 +1,12 @@
 import * as path from 'path';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
 import * as vscode from 'vscode';
 import { countTaskProgress, looksLikeSpec, parseSpecText, ParsedSpec, SpecTaskProgress } from './parser';
+import { compareChangeSortKey, parseFolderDateTimestamp } from './change-sort';
 import { getChangeFolderName, getChangeRootPath, isChangeFilePath, isChangeSpecPath, isOpenSpecPath, isSourceSpecPath } from './paths';
+
+const execFileAsync = promisify(execFile);
 
 export type OpenSpecDocumentKind = 'source' | 'change';
 
@@ -72,6 +77,43 @@ function createEmptyChangeSummary(filePath: string): ChangeSummary {
     title: folderName,
     status,
   };
+}
+
+async function getFolderTimestamp(folderUri: vscode.Uri): Promise<number | null> {
+  try {
+    const stat = await vscode.workspace.fs.stat(folderUri);
+
+    return stat.ctime > 0 ? stat.ctime : stat.mtime > 0 ? stat.mtime : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getGitTimestamp(folderUri: vscode.Uri): Promise<number | null> {
+  const workspaceFolder = vscode.workspace.getWorkspaceFolder(folderUri);
+
+  if (!workspaceFolder) {
+    return null;
+  }
+
+  const relativePath = path.relative(workspaceFolder.uri.fsPath, folderUri.fsPath) || '.';
+
+  try {
+    const { stdout } = await execFileAsync('git', [
+      '-C',
+      workspaceFolder.uri.fsPath,
+      'log',
+      '-1',
+      '--format=%ct',
+      '--',
+      relativePath,
+    ]);
+    const timestamp = Number(String(stdout).trim());
+
+    return Number.isNaN(timestamp) ? null : timestamp * 1000;
+  } catch {
+    return null;
+  }
 }
 
 function getSelectedTab(filePath: string): ChangeTabName {
@@ -173,7 +215,19 @@ export async function listChangeSummaries(): Promise<ChangeSummary[]> {
     buckets.set(key, existing);
   }
 
-  return [...buckets.values()].sort((left, right) => left.name.localeCompare(right.name));
+  const rankedChanges = await Promise.all([...buckets.values()].map(async (change) => ({
+    change,
+    sortKey: {
+      name: change.name,
+      folderTimestamp: await getFolderTimestamp(change.folderUri),
+      gitTimestamp: await getGitTimestamp(change.folderUri),
+      dateTimestamp: parseFolderDateTimestamp(change.name),
+    },
+  })));
+
+  return rankedChanges
+    .sort((left, right) => compareChangeSortKey(left.sortKey, right.sortKey))
+    .map(({ change }) => change);
 }
 
 export async function readChangeDocument(uri: vscode.Uri): Promise<ChangeDocument | null> {
