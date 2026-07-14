@@ -36,6 +36,14 @@ Openspec changes without leaving the editor.
 The extension reads Openspec markdown files from the workspace and does not
 require a separate server or database.
 
+## Video Demo
+
+
+
+https://github.com/user-attachments/assets/248784df-3632-4846-89cb-8c636321e05f
+
+
+
 ## Review Workflow
 
 1. Open an Openspec artifact in the custom viewer.
