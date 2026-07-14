@@ -23,6 +23,8 @@ Openspec changes without leaving the editor.
   or Git activity.
 - **Spec viewer:** Open `proposal.md`, `design.md`, `tasks.md`, and `spec.md`
   with the extension's custom viewer.
+- **Mermaid diagrams:** Render Mermaid diagrams embedded in Openspec markdown,
+  with a readable fallback when a diagram cannot be rendered.
 - **Artifact comments:** Add review comments directly to lines in rendered
   Openspec artifacts.
 - **CLI handoff:** Use `Copy Comments` to copy all current comments, including
