@@ -1,11 +1,13 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { OpenspecSidebarViewProvider } from './views/sidebar';
+import { OpenspecDashboardPanel } from './views/dashboard';
 import { OpenspecSpecEditorProvider } from './editors/spec-editor';
 import { isChangeFilePath, isOpenSpecPath } from './specs/paths';
 
 export function activate(context: vscode.ExtensionContext): void {
   const dashboard = new OpenspecSidebarViewProvider(context.extensionUri);
+  const dashboardPanel = new OpenspecDashboardPanel(context.extensionUri);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(OpenspecSidebarViewProvider.viewType, dashboard),
@@ -20,10 +22,11 @@ export function activate(context: vscode.ExtensionContext): void {
       },
     ),
     vscode.commands.registerCommand('openspec.showDashboard', () => {
-      void vscode.commands.executeCommand('workbench.view.extension.openspec');
+      dashboardPanel.show();
     }),
     vscode.commands.registerCommand('openspec.refreshDashboard', () => {
       void dashboard.refresh();
+      void dashboardPanel.refresh();
     }),
     vscode.commands.registerCommand('openspec.openSpec', async (uri: vscode.Uri) => {
       if (!(uri instanceof vscode.Uri)) {
@@ -44,12 +47,16 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const specWatcher = vscode.workspace.createFileSystemWatcher('**/openspec/**/*.md');
   const configWatcher = vscode.workspace.createFileSystemWatcher('**/openspec/config.yaml');
-  specWatcher.onDidCreate(() => void dashboard.refresh());
-  specWatcher.onDidChange(() => void dashboard.refresh());
-  specWatcher.onDidDelete(() => void dashboard.refresh());
-  configWatcher.onDidCreate(() => void dashboard.refresh());
-  configWatcher.onDidChange(() => void dashboard.refresh());
-  configWatcher.onDidDelete(() => void dashboard.refresh());
+  const refreshViews = (): void => {
+    void dashboard.refresh();
+    void dashboardPanel.refresh();
+  };
+  specWatcher.onDidCreate(refreshViews);
+  specWatcher.onDidChange(refreshViews);
+  specWatcher.onDidDelete(refreshViews);
+  configWatcher.onDidCreate(refreshViews);
+  configWatcher.onDidChange(refreshViews);
+  configWatcher.onDidDelete(refreshViews);
   context.subscriptions.push(specWatcher, configWatcher);
 }
 

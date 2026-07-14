@@ -26,6 +26,9 @@ export interface ChangeSummary {
   taskProgress: SpecTaskProgress;
   title: string;
   status: 'active' | 'archive';
+  createdTimestamp: number | null;
+  updatedTimestamp: number | null;
+  createdBy: string | null;
 }
 
 export interface ChangeDocument {
@@ -76,6 +79,9 @@ function createEmptyChangeSummary(filePath: string): ChangeSummary {
     },
     title: folderName,
     status,
+    createdTimestamp: null,
+    updatedTimestamp: null,
+    createdBy: null,
   };
 }
 
@@ -89,11 +95,11 @@ async function getFolderTimestamp(folderUri: vscode.Uri): Promise<number | null>
   }
 }
 
-async function getGitTimestamp(folderUri: vscode.Uri): Promise<number | null> {
+async function getGitMetadata(folderUri: vscode.Uri): Promise<Pick<ChangeSummary, 'createdBy' | 'createdTimestamp' | 'updatedTimestamp'>> {
   const workspaceFolder = vscode.workspace.getWorkspaceFolder(folderUri);
 
   if (!workspaceFolder) {
-    return null;
+    return { createdBy: null, createdTimestamp: null, updatedTimestamp: null };
   }
 
   const relativePath = path.relative(workspaceFolder.uri.fsPath, folderUri.fsPath) || '.';
@@ -103,16 +109,33 @@ async function getGitTimestamp(folderUri: vscode.Uri): Promise<number | null> {
       '-C',
       workspaceFolder.uri.fsPath,
       'log',
-      '-1',
-      '--format=%ct',
+      '--format=%ct%x09%an',
       '--',
       relativePath,
     ]);
-    const timestamp = Number(String(stdout).trim());
+    const entries = String(stdout)
+      .trim()
+      .split(/\r?\n/)
+      .filter((line) => line.trim().length > 0)
+      .map((line) => {
+        const [timestamp, ...authorParts] = line.split('\t');
 
-    return Number.isNaN(timestamp) ? null : timestamp * 1000;
+        return {
+          author: authorParts.join('\t').trim() || null,
+          timestamp: Number(timestamp) * 1000,
+        };
+      })
+      .filter((entry) => !Number.isNaN(entry.timestamp));
+    const latest = entries[0];
+    const earliest = entries[entries.length - 1];
+
+    return {
+      createdBy: earliest?.author ?? null,
+      createdTimestamp: earliest?.timestamp ?? null,
+      updatedTimestamp: latest?.timestamp ?? null,
+    };
   } catch {
-    return null;
+    return { createdBy: null, createdTimestamp: null, updatedTimestamp: null };
   }
 }
 
@@ -215,15 +238,26 @@ export async function listChangeSummaries(): Promise<ChangeSummary[]> {
     buckets.set(key, existing);
   }
 
-  const rankedChanges = await Promise.all([...buckets.values()].map(async (change) => ({
-    change,
-    sortKey: {
-      name: change.name,
-      folderTimestamp: await getFolderTimestamp(change.folderUri),
-      gitTimestamp: await getGitTimestamp(change.folderUri),
-      dateTimestamp: parseFolderDateTimestamp(change.name),
-    },
-  })));
+  const rankedChanges = await Promise.all([...buckets.values()].map(async (change) => {
+    const folderTimestamp = await getFolderTimestamp(change.folderUri);
+    const gitMetadata = await getGitMetadata(change.folderUri);
+    const gitTimestamp = gitMetadata.updatedTimestamp;
+    const dateTimestamp = parseFolderDateTimestamp(change.name);
+
+    change.createdBy = gitMetadata.createdBy;
+    change.createdTimestamp = gitMetadata.createdTimestamp ?? dateTimestamp ?? folderTimestamp;
+    change.updatedTimestamp = gitTimestamp ?? folderTimestamp ?? dateTimestamp;
+
+    return {
+      change,
+      sortKey: {
+        name: change.name,
+        folderTimestamp,
+        gitTimestamp,
+        dateTimestamp,
+      },
+    };
+  }));
 
   return rankedChanges
     .sort((left, right) => compareChangeSortKey(left.sortKey, right.sortKey))

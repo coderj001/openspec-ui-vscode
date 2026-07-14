@@ -72,9 +72,14 @@ function renderSection(title: string, items: readonly ChangeSummary[]): string {
     return '';
   }
 
+  const titleClass = title.toLowerCase() === 'active' ? 'section__title section__title--active' : 'section__title';
+
   return `
     <section class="section">
-      <div class="section__title">${escapeHtml(title)}</div>
+      <div class="${titleClass}">
+        <span class="section__title-mark" aria-hidden="true"></span>
+        <span>${escapeHtml(title)}</span>
+      </div>
       ${items.map((item) => renderCard(item, false)).join('')}
     </section>
   `;
@@ -88,7 +93,10 @@ function renderArchiveSection(items: readonly ChangeSummary[]): string {
   return `
     <details class="archive">
       <summary class="archive__summary">
-        <span>Archive</span>
+        <span class="archive__label-wrap">
+          <span class="archive__chevron" aria-hidden="true">⌄</span>
+          <span class="archive__label">Archive</span>
+        </span>
         <span class="archive__count">${items.length}</span>
       </summary>
       <div class="section">
@@ -145,6 +153,10 @@ function renderHtml(changes: ChangeSummary[], cspSource: string, nonce: string):
           width: auto;
           padding: 6px 10px;
         }
+        .toolbar__actions {
+          display: flex;
+          gap: 6px;
+        }
         .section {
           display: grid;
           gap: 6px;
@@ -153,11 +165,26 @@ function renderHtml(changes: ChangeSummary[], cspSource: string, nonce: string):
           margin-top: 12px;
         }
         .section__title {
+          display: flex;
+          align-items: center;
+          gap: 6px;
           color: var(--vscode-descriptionForeground);
           font-size: 0.78rem;
           text-transform: uppercase;
           letter-spacing: 0.08em;
           padding: 2px 2px 0;
+        }
+        .section__title--active {
+          color: var(--vscode-testing-iconPassed);
+        }
+        .section__title-mark {
+          width: 8px;
+          height: 8px;
+          border-radius: 999px;
+          background: currentColor;
+          display: inline-grid;
+          place-items: center;
+          flex: 0 0 auto;
         }
         .card {
           width: 100%;
@@ -268,18 +295,46 @@ function renderHtml(changes: ChangeSummary[], cspSource: string, nonce: string):
           gap: 8px;
           cursor: pointer;
           list-style: none;
-          color: var(--vscode-sideBar-foreground);
-          background: var(--vscode-sideBar-background);
-          border: 1px solid var(--vscode-panel-border);
-          border-radius: 10px;
-          padding: 9px 10px;
+          color: var(--vscode-editorWarning-foreground);
+          background: color-mix(in srgb, var(--vscode-editorWarning-foreground) 8%, var(--vscode-sideBar-background));
+          border: 1px solid color-mix(in srgb, var(--vscode-editorWarning-foreground) 28%, var(--vscode-panel-border));
+          border-radius: 12px;
+          padding: 10px 10px;
+          font-weight: 600;
+        }
+        .archive__summary:hover,
+        .archive__summary:focus-visible {
+          border-color: var(--vscode-focusBorder);
+        }
+        .archive__label-wrap {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          min-width: 0;
+        }
+        .archive__label {
+          color: inherit;
+        }
+        .archive__chevron {
+          display: inline-grid;
+          place-items: center;
+          width: 16px;
+          height: 16px;
+          border-radius: 999px;
+          background: color-mix(in srgb, currentColor 18%, transparent);
+          font-size: 0.85rem;
+          line-height: 0;
+          transition: transform 120ms ease;
+        }
+        .archive[open] .archive__chevron {
+          transform: rotate(180deg);
         }
         .archive__summary::-webkit-details-marker {
           display: none;
         }
         .archive__count {
           color: var(--vscode-badge-foreground);
-          background: var(--vscode-badge-background);
+          background: color-mix(in srgb, currentColor 16%, var(--vscode-badge-background));
           border-radius: 999px;
           padding: 2px 8px;
           font-size: 0.75rem;
@@ -295,13 +350,19 @@ function renderHtml(changes: ChangeSummary[], cspSource: string, nonce: string):
     <body>
       <div class="toolbar">
         <strong>Openspec</strong>
-        <button data-action="refresh">Refresh</button>
+        <div class="toolbar__actions">
+          <button data-action="dashboard">Dashboard</button>
+          <button data-action="refresh">Refresh</button>
+        </div>
       </div>
       ${changes.length === 0 ? '<div class="empty">No openspec changes under openspec/changes.</div>' : ''}
       ${renderSection('Active', active)}
       ${renderArchiveSection(archived)}
       <script nonce="${nonce}">
         const vscode = acquireVsCodeApi();
+        document.querySelector('[data-action="dashboard"]').addEventListener('click', () => {
+          vscode.postMessage({ type: 'showDashboard' });
+        });
         document.querySelector('[data-action="refresh"]').addEventListener('click', () => {
           vscode.postMessage({ type: 'refresh' });
         });
@@ -332,6 +393,11 @@ export class OpenspecSidebarViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage((message: { type?: string; uri?: string }) => {
       if (message.type === 'refresh') {
         void this.refresh();
+        return;
+      }
+
+      if (message.type === 'showDashboard') {
+        void vscode.commands.executeCommand('openspec.showDashboard');
         return;
       }
 
