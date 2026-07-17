@@ -1,65 +1,88 @@
-# Openspec UI
+<p align="center">
+  <img src="./resources/openspec.svg" width="64" alt="Openspec UI icon">
+</p>
 
-Openspec UI is a VS Code extension for browsing, opening, and understanding
-Openspec changes without leaving the editor.
+<h1 align="center">Openspec UI</h1>
 
-## Features
+<p align="center">
+  A visual workspace for browsing, reviewing, and understanding Openspec changes in VS Code.
+</p>
 
-- **Change explorer:** Browse active changes and archived changes in the
-  Openspec activity-bar view.
-- **Progress at a glance:** See proposal, design, tasks, and specs availability
-  for each change, along with completed tasks and progress bars.
-- **Separate dashboard:** Open `Openspec: Show Dashboard` for a larger view of
-  the change portfolio and its analytics.
-- **Portfolio statistics:** Track active and archived changes, total and
-  remaining tasks, completed-task percentage, delta specs, and document
-  coverage.
-- **Active workload:** Quickly identify active changes with unfinished tasks.
-- **Git insights:** See change creators and spec counts based on Git history
-  when the workspace is a Git repository.
-- **Change timeline:** Compare changes started and archived by month using Git
-  and folder timestamps.
-- **Sorting:** Sort active and archived changes by date, folder creation time,
-  or Git activity.
-- **Spec viewer:** Open `proposal.md`, `design.md`, `tasks.md`, and `spec.md`
-  with the extension's custom viewer.
-- **Mermaid diagrams:** Render Mermaid diagrams embedded in Openspec markdown,
-  with a readable fallback when a diagram cannot be rendered.
-- **Artifact comments:** Add review comments directly to lines in rendered
-  Openspec artifacts.
-- **CLI handoff:** Use `Copy Comments` to copy all current comments, including
-  artifact names and line numbers, so they can be pasted into Codex,
-  Claude Code, or another CLI tool to update the Openspec change.
-- **Live refresh:** Refresh manually or let file changes update the sidebar and
-  dashboard automatically.
+<p align="center">
+  <code>change explorer</code>&nbsp;&nbsp; <code>progress dashboard</code>&nbsp;&nbsp; <code>commentable viewer</code>
+</p>
 
-The extension reads Openspec markdown files from the workspace and does not
-require a separate server or database.
+## See it in action
 
-## Video Demo
-
-
+Open changes from the Openspec activity bar, inspect their progress, and review
+artifacts without leaving the editor.
 
 https://github.com/user-attachments/assets/248784df-3632-4846-89cb-8c636321e05f
 
+## Why Openspec UI?
 
+Openspec UI turns a folder of markdown artifacts into a navigable workspace:
 
-## Review Workflow
+- **Find the work:** Browse active and archived changes from the Openspec
+  activity-bar view, with sorting by date, folder creation time, or Git activity.
+- **Understand status:** Track proposals, designs, tasks, specs, task completion,
+  document coverage, and delta specs from the sidebar and dashboard.
+- **Review in context:** Open `proposal.md`, `design.md`, `tasks.md`, and
+  `spec.md` in a custom viewer with line-level comments.
+- **Hand feedback to your coding agent:** Use `Copy Comments` to export comments,
+  artifact names, and line numbers for Codex, Claude Code, or another CLI tool.
+- **Read richer artifacts:** Render Mermaid diagrams with a readable fallback when
+  a diagram cannot be rendered.
+- **Stay current:** Refresh manually or let file changes update the sidebar and
+  dashboard automatically.
 
-1. Open an Openspec artifact in the custom viewer.
-2. Select the comment icon beside a line and add your feedback.
-3. Select `Copy Comments` and paste the exported context into your preferred
-   CLI coding tool.
+## A focused review loop
 
-Comments are collected for the current viewer session and are not written into
-the Openspec markdown files.
+```text
+Open an artifact  →  Comment on a line  →  Copy the review context  →  Update the change
+```
 
-## Scripts
+Comments belong to the current viewer session and are not written into the
+Openspec markdown files.
 
-- `npm run compile`
-- `npm run test`
-- `npm run watch`
+## How it works
 
-## Releases
+The extension reads Openspec markdown directly from the current workspace and
+does not require a separate server or database.
 
-- Push a tag like `v0.1.0` to build the VSIX and create a GitHub Release.
+It watches:
+
+- `openspec/**/*.md`
+- `openspec/config.yaml`
+
+When these files change, the sidebar and dashboard refresh automatically.
+
+## Install locally
+
+This repository is currently set up for local VS Code extension development.
+
+```bash
+npm install
+npm run compile
+npm run vsceBuild
+```
+
+Then install the generated `.vsix` file from VS Code with **Extensions → … →
+Install from VSIX…**.
+
+## Develop and verify
+
+```bash
+npm run watch    # Compile on changes
+npm run test     # Compile and run the test suite
+npm run lint     # Check TypeScript sources
+```
+
+## Release
+
+Push a tag such as `v0.1.0` to build the VSIX and create a GitHub Release.
+
+## Project status
+
+The current release is `v0.0.1`. See the [changelog](./CHANGELOG.md) for the
+features included in the initial release.
