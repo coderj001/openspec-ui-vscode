@@ -150,12 +150,26 @@ function renderHtml(changes: readonly ChangeSummary[], cspSource: string, nonce:
         .creator-list { display: grid; gap: 14px; }
         .creator-row { display: grid; gap: 4px; }
         .creator-row__head, .timeline-row__head { display: flex; justify-content: space-between; gap: 12px; }
-        .timeline { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 12px; align-items: end; min-height: 180px; }
-        .timeline-row { display: grid; gap: 8px; }
-        .timeline-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; align-items: end; height: 116px; }
-        .timeline-bars i { display: block; min-height: 3px; border-radius: 7px 7px 0 0; background: var(--bar-color); }
+        .timeline-legend { display: flex; gap: 18px; margin-bottom: 16px; }
+        .timeline-legend span { display: flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--vscode-descriptionForeground); }
+        .timeline-legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 3px; background: var(--dot-color); flex-shrink: 0; }
+        .timeline-legend .dot-started { --dot-color: var(--vscode-textLink-foreground); }
+        .timeline-legend .dot-archived { --dot-color: var(--vscode-editorWarning-foreground); }
+        .timeline-chart { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 8px; }
+        .timeline-y-axis { display: flex; height: 120px; padding-bottom: 29px; box-sizing: content-box; flex-direction: column; justify-content: space-between; color: var(--vscode-descriptionForeground); font-size: .68rem; text-align: right; }
+        .timeline-plot { position: relative; }
+        .timeline-gridlines { position: absolute; inset: 0 0 36px 0; display: flex; flex-direction: column; justify-content: space-between; pointer-events: none; z-index: 0; }
+        .timeline-gridlines span { display: block; border-top: 1px dashed color-mix(in srgb, var(--vscode-panel-border) 60%, transparent); width: 100%; }
+        .timeline { display: grid; grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); gap: 8px; align-items: end; position: relative; z-index: 1; }
+        .timeline-row { display: flex; flex-direction: column; align-items: stretch; gap: 0; }
+        .timeline-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; align-items: end; height: 120px; border-bottom: 2px solid color-mix(in srgb, var(--vscode-panel-border) 80%, transparent); padding-bottom: 0; }
+        .timeline-bars i { display: block; min-height: 3px; border-radius: 5px 5px 0 0; background: var(--bar-color); transition: opacity .15s; position: relative; }
         .timeline-bars i:first-child { --bar-color: var(--vscode-textLink-foreground); }
         .timeline-bars i:last-child { --bar-color: var(--vscode-editorWarning-foreground); }
+        .timeline-bars i .bar-val { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: .68rem; white-space: nowrap; color: var(--vscode-descriptionForeground); opacity: 0; transition: opacity .15s; pointer-events: none; }
+        .timeline-bars i:hover .bar-val { opacity: 1; }
+        .timeline-bars i:hover { opacity: .8; }
+        .timeline-month { text-align: center; font-size: .72rem; color: var(--vscode-descriptionForeground); margin-top: 7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .empty { color: var(--vscode-descriptionForeground); padding: 12px 0; }
         @media (max-width: 800px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .grid { grid-template-columns: 1fr; } .panel--wide { grid-column: auto; } }
         @media (max-width: 460px) { header { align-items: start; flex-direction: column; } .completion { gap: 16px; } }
@@ -213,18 +227,29 @@ function renderHtml(changes: readonly ChangeSummary[], cspSource: string, nonce:
             </div>
           </section>
           <section class="panel panel--wide">
-            <div class="panel__head"><h2>Started vs archived timeline</h2><span class="muted">by month</span></div>
-            <div class="legend"><span>● Started</span><span>● Archived</span></div>
-            <div class="timeline">
-              ${timeline.map(([, item]) => `
-                <div class="timeline-row">
-                  <div class="timeline-bars">
-                    <i title="${item.started} started" style="height:${percent(item.started, timelineMax)}%"></i>
-                    <i title="${item.archived} archived" style="height:${percent(item.archived, timelineMax)}%"></i>
-                  </div>
-                  <div class="timeline-row__head"><span>${monthLabel(item.timestamp)}</span><span class="muted">${item.started}/${item.archived}</span></div>
+            <div class="panel__head"><h2>Started vs archived timeline</h2><span class="muted">changes per month</span></div>
+            <div class="timeline-legend">
+              <span class="dot-started">Started</span>
+              <span class="dot-archived">Archived</span>
+            </div>
+            <div class="timeline-chart">
+              <div class="timeline-y-axis" aria-hidden="true">
+                <span>${timelineMax}</span><span>${Math.ceil((timelineMax * 2) / 3)}</span><span>${Math.ceil(timelineMax / 3)}</span><span>0</span>
+              </div>
+              <div class="timeline-plot">
+                <div class="timeline-gridlines" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+                <div class="timeline">
+                  ${timeline.map(([, item]) => `
+                    <div class="timeline-row">
+                      <div class="timeline-bars">
+                        <i aria-label="${item.started} changes started" style="height:${percent(item.started, timelineMax)}%"><span class="bar-val">${item.started} started</span></i>
+                        <i aria-label="${item.archived} changes archived" style="height:${percent(item.archived, timelineMax)}%"><span class="bar-val">${item.archived} archived</span></i>
+                      </div>
+                      <div class="timeline-month">${monthLabel(item.timestamp)}</div>
+                    </div>
+                  `).join('') || '<div class="empty">No timeline data yet.</div>'}
                 </div>
-              `).join('') || '<div class="empty">No timeline data yet.</div>'}
+              </div>
             </div>
           </section>
         </div>

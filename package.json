@@ -4,6 +4,10 @@
   "description": "VSCode extension for browsing and viewing Openspec documents.",
   "version": "0.0.1",
   "publisher": "openspec",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/coderj001/openspec-ui-vscode.git"
+  },
   "engines": {
     "vscode": "^1.86.0"
   },

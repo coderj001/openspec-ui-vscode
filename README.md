@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./resources/openspec.svg" width="64" alt="Openspec UI icon">
+  <img src="./resources/openspec.png" width="64" alt="Openspec UI icon">
 </p>
 
 <h1 align="center">Openspec UI</h1>
