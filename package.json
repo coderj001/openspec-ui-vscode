@@ -2,7 +2,7 @@
   "name": "openspec-ext",
   "displayName": "Openspec UI",
   "description": "VSCode extension for browsing and viewing Openspec documents.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "openspec",
   "repository": {
     "type": "git",
